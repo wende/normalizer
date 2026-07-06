@@ -20,9 +20,9 @@
           </label>
           <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp">
           <button id="sampleButton" type="button">Sample</button>
-          <button id="aiCheckButton" type="button">Check AI</button>
-          <button id="aiGenerateButton" type="button">AI Augment</button>
-          <button id="clearAiButton" type="button">Clear AI</button>
+          <!-- <button id="aiCheckButton" type="button">Check AI</button> -->
+          <!-- <button id="aiGenerateButton" type="button">AI Augment</button> -->
+          <!-- <button id="clearAiButton" type="button">Clear AI</button> -->
           <button id="exportButton" type="button">Export PNG</button>
         </div>
       </header>
@@ -90,15 +90,15 @@
 
           <div class="toggles">
             <label><input id="softBisel" type="checkbox" checked> Soft bevel</label>
-            <label><input id="invertX" type="checkbox"> Invert X</label>
-            <label><input id="invertY" type="checkbox"> Invert Y</label>
-            <label><input id="invertZ" type="checkbox"> Invert Z</label>
+            <!-- <label><input id="invertX" type="checkbox"> Invert X</label> -->
+            <!-- <label><input id="invertY" type="checkbox"> Invert Y</label> -->
+            <!-- <label><input id="invertZ" type="checkbox"> Invert Z</label> -->
             <label><input id="useAlpha" type="checkbox"> Use alpha</label>
           </div>
 
-          <div class="panel-title">AI</div>
+          <!-- <div class="panel-title">AI</div> -->
 
-          <label class="field-row">
+          <!-- <label class="field-row">
             <span>uv</span>
             <input id="uvPath" type="text" value="uv" spellcheck="false">
           </label>
@@ -138,11 +138,11 @@
             <span>Blend</span>
             <input id="aiBlend" type="range" min="0" max="100" value="65">
             <output for="aiBlend">65</output>
-          </label>
+          </label> -->
         </aside>
       </section>
     </main>
 
-    <script src="app.js?v=ai-normalcy-5"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

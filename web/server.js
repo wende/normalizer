@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
-const { spawn } = require("node:child_process");
-const { createReadStream, promises: fs } = require("node:fs");
-const http = require("node:http");
-const os = require("node:os");
-const path = require("node:path");
-const { URL } = require("node:url");
+import { spawn } from "node:child_process";
+import { createReadStream, promises as fs } from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import { URL, fileURLToPath } from "node:url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const webRoot = __dirname;
 const normalcyProject = path.join(repoRoot, "third_party", "normalcy");
@@ -181,7 +183,7 @@ function staticPath(urlPath) {
     pathname = pathname.slice(4);
   }
 
-  const staticRoot = pathname.startsWith("/laigter/") ? repoRoot : webRoot;
+  const staticRoot = pathname.startsWith("/laigter/") || pathname.startsWith("/shared/") ? repoRoot : webRoot;
   const resolved = path.resolve(staticRoot, `.${pathname}`);
   if (!resolved.startsWith(staticRoot)) {
     return null;
