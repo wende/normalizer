@@ -13,6 +13,7 @@ const state = {
     x: 0,
     y: 0,
   },
+  aiDeviceUsed: "",
 };
 
 const el = {
@@ -20,6 +21,7 @@ const el = {
   sampleButton: document.querySelector("#sampleButton"),
   aiCheckButton: document.querySelector("#aiCheckButton"),
   aiGenerateButton: document.querySelector("#aiGenerateButton"),
+  clearAiButton: document.querySelector("#clearAiButton"),
   exportButton: document.querySelector("#exportButton"),
   canvas: document.querySelector("#previewCanvas"),
   status: document.querySelector("#status"),
@@ -127,6 +129,14 @@ function debounceGenerate() {
 
 function setStatus(text) {
   el.status.textContent = text;
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  for (const item of el.modeButtons) {
+    item.classList.toggle("active", item.dataset.mode === mode);
+  }
+  drawPreview();
 }
 
 function storeAiSettings() {
@@ -655,6 +665,8 @@ function drawPreview() {
     drawImageData(litPreview(), rect);
   } else if (state.mode === "normal") {
     drawImageData(state.normal, rect);
+  } else if (state.mode === "ai") {
+    drawImageData(state.aiOverlay || state.normal, rect);
   } else {
     drawImageData(state.source, rect);
     ctx.save();
@@ -749,7 +761,15 @@ function setAiRunning(running) {
   state.aiRunning = running;
   el.aiGenerateButton.disabled = running;
   el.aiCheckButton.disabled = running;
+  el.clearAiButton.disabled = running;
   el.aiGenerateButton.textContent = running ? "Generating..." : "AI Augment";
+}
+
+function clearAiOverlay() {
+  state.aiOverlay = null;
+  state.aiDeviceUsed = "";
+  generateAndDraw();
+  setStatus("Original normal map restored");
 }
 
 async function checkAiBackend() {
@@ -796,8 +816,9 @@ async function generateAiOverlay() {
     }
 
     state.aiOverlay = overlay;
+    state.aiDeviceUsed = response.headers.get("x-normalcy-device") || aiParams().device;
     generateAndDraw();
-    setStatus("AI normal overlay applied");
+    setStatus(`AI normal map applied (${state.aiDeviceUsed}); diffuse unchanged`);
   } catch (error) {
     setStatus(error.message);
   } finally {
@@ -923,15 +944,12 @@ el.input.addEventListener("change", () => loadFile(el.input.files[0]));
 el.sampleButton.addEventListener("click", loadSample);
 el.aiCheckButton.addEventListener("click", checkAiBackend);
 el.aiGenerateButton.addEventListener("click", generateAiOverlay);
+el.clearAiButton.addEventListener("click", clearAiOverlay);
 el.exportButton.addEventListener("click", exportPng);
 
 for (const button of el.modeButtons) {
   button.addEventListener("click", () => {
-    state.mode = button.dataset.mode;
-    for (const item of el.modeButtons) {
-      item.classList.toggle("active", item === button);
-    }
-    drawPreview();
+    setMode(button.dataset.mode);
   });
 }
 

@@ -180,8 +180,10 @@ function staticPath(urlPath) {
   } else if (pathname.startsWith("/web/")) {
     pathname = pathname.slice(4);
   }
-  const resolved = path.resolve(webRoot, `.${pathname}`);
-  if (!resolved.startsWith(webRoot)) {
+
+  const staticRoot = pathname.startsWith("/laigter/") ? repoRoot : webRoot;
+  const resolved = path.resolve(staticRoot, `.${pathname}`);
+  if (!resolved.startsWith(staticRoot)) {
     return null;
   }
   return resolved;

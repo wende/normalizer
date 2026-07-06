@@ -133,7 +133,7 @@ button:hover,
 
 .segmented {
   display: inline-grid;
-  grid-template-columns: repeat(4, minmax(68px, 1fr));
+  grid-template-columns: repeat(5, minmax(58px, 1fr));
   border: 1px solid var(--line);
   border-radius: 6px;
   overflow: hidden;
