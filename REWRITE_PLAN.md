@@ -214,3 +214,6 @@ Why this over alternatives:
 | CImg `blur()` float drift across compilers/WASM | Tolerance-based diffing; pin Emscripten version |
 | OpenMP loops silently serialize in WASM | Acceptable initially; measure, then enable pthreads if needed |
 | GPL-3 obligations | Keep the whole app GPL-3; no proprietary distribution |
+
+### Current completion status (2026-07-06)
+The MVP vertical slice is partially complete: `core/` now has a Qt-free normal-map generation API and native CLI, and `web/` has a dependency-free browser UI that loads the bundled sample or uploaded images, exposes the normal-map controls, exports a normal PNG, previews split/lit/normal/diffuse modes, includes pixelated and toon generation toggles, controls light height, and supports one draggable Laigter-textured light source. Still not implemented: golden-output corpus and pixel-diff validation, the full cached core context and dirty-stage graph, parallax/specular/occlusion generation, tileable neighbour mosaics, sprite sheets and animation, custom heightmap/specular inputs in the UI, WASM bindings, TypeScript wrapper, Web Workers, React/Vite/Tauri shell, WebGL2 shader preview, complete multi-light/ambient/specular/parallax preview controls, full parameter panels, presets, project import/export, batch export, CI parity validation, and performance-budget validation.
