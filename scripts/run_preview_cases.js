@@ -14,7 +14,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pngjs from "pngjs";
 import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
-import { buildLitPreview } from "../shared/preview.js";
+import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "../shared/preview.js";
 
 const { PNG } = pngjs;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -55,7 +55,7 @@ function runCase(repo, caseObj, outDir) {
   const source = loadPng(resolve(repo, caseObj.input));
   const params = { ...DEFAULT_NORMAL_PARAMS, ...(caseObj.params || {}) };
   const normal = generateNormalMap(source, params);
-  const light = caseObj.light || { x: 0, y: 0, z: 0.3 };
+  const light = { ...DEFAULT_LIGHT_PARAMS, ...(caseObj.light || {}) };
   const lit = buildLitPreview(source, normal, light, Boolean(caseObj.toon));
 
   const outPath = resolve(repo, outDir, `${caseObj.id}_preview.png`);

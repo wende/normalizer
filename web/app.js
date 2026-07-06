@@ -30,6 +30,8 @@ const el = {
   canvas: document.querySelector("#previewCanvas"),
   status: document.querySelector("#status"),
   modeButtons: [...document.querySelectorAll("[data-mode]")],
+  controlTabButtons: [...document.querySelectorAll("[data-control-tab]")].filter((button) => button.closest(".control-tabs")),
+  controlPanels: [...document.querySelectorAll(".control-panel")],
   controls: {
     normalDepth: document.querySelector("#normalDepth"),
     normalBlur: document.querySelector("#normalBlur"),
@@ -43,6 +45,12 @@ const el = {
     useAlpha: document.querySelector("#useAlpha"),
     pixelated: document.querySelector("#pixelated"),
     toon: document.querySelector("#toon"),
+    diffuseIntensity: document.querySelector("#diffuseIntensity"),
+    specularIntensity: document.querySelector("#specularIntensity"),
+    specularScatter: document.querySelector("#specularScatter"),
+    ambientIntensity: document.querySelector("#ambientIntensity"),
+    ambientColor: document.querySelector("#ambientColor"),
+    lightColor: document.querySelector("#lightColor"),
     lightHeight: document.querySelector("#lightHeight"),
     uvPath: document.querySelector("#uvPath"),
     aiDevice: document.querySelector("#aiDevice"),
@@ -94,11 +102,32 @@ function aiParams() {
   };
 }
 
+function hexToRgb01(hex) {
+  const value = hex.replace("#", "");
+  const full = value.length === 3
+    ? value.split("").map((ch) => ch + ch).join("")
+    : value;
+  const int = Number.parseInt(full, 16);
+  return [
+    ((int >> 16) & 255) / 255,
+    ((int >> 8) & 255) / 255,
+    (int & 255) / 255,
+  ];
+}
+
 function currentLight() {
+  const color = hexToRgb01(el.controls.lightColor.value);
   return {
     x: state.light.x,
     y: state.light.y,
     z: Number(el.controls.lightHeight.value) / 100,
+    diffuseColor: color,
+    diffuseIntensity: Number(el.controls.diffuseIntensity.value) / 100,
+    specularColor: color,
+    specularIntensity: Number(el.controls.specularIntensity.value) / 100,
+    specularScatter: Number(el.controls.specularScatter.value),
+    ambientColor: hexToRgb01(el.controls.ambientColor.value),
+    ambientIntensity: Number(el.controls.ambientIntensity.value) / 100,
   };
 }
 
@@ -143,6 +172,19 @@ function setMode(mode) {
     item.classList.toggle("active", item.dataset.mode === mode);
   }
   drawPreview();
+}
+
+function setControlTab(tab) {
+  for (const button of el.controlTabButtons) {
+    const active = button.dataset.controlTab === tab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  for (const panel of el.controlPanels) {
+    const active = panel.dataset.controlTab === tab;
+    panel.classList.toggle("active", active);
+    panel.hidden = !active;
+  }
 }
 
 function storeAiSettings() {
@@ -615,19 +657,20 @@ el.canvas.addEventListener("pointerleave", (event) => {
   }
 });
 
+const LIGHT_PREVIEW_CONTROLS = [
+  "pixelated",
+  "toon",
+  "diffuseIntensity",
+  "specularIntensity",
+  "specularScatter",
+  "ambientIntensity",
+  "ambientColor",
+  "lightColor",
+  "lightHeight",
+];
+
 for (const [key, input] of Object.entries(el.controls)) {
-  if (
-    key === "pixelated" ||
-    key === "toon" ||
-    key === "lightHeight" ||
-    // AI controls (UI commented out)
-    key === "uvPath" ||
-    key === "aiDevice" ||
-    key === "aiModelSize" ||
-    key === "aiVolume" ||
-    key === "aiExtrude" ||
-    key === "aiBlend"
-  ) {
+  if (LIGHT_PREVIEW_CONTROLS.includes(key)) {
     continue;
   }
   if (!input) continue;
@@ -648,14 +691,28 @@ el.controls.pixelated.addEventListener("change", drawPreview);
 el.controls.toon.addEventListener("change", () => {
   redrawLitPreview();
 });
-el.controls.lightHeight.addEventListener("input", () => {
-  syncOutputs();
-  redrawLitPreview();
-});
-el.controls.lightHeight.addEventListener("change", () => {
-  syncOutputs();
-  redrawLitPreview();
-});
+
+for (const key of [
+  "diffuseIntensity",
+  "specularIntensity",
+  "specularScatter",
+  "ambientIntensity",
+  "lightHeight",
+]) {
+  el.controls[key].addEventListener("input", () => {
+    syncOutputs();
+    redrawLitPreview();
+  });
+  el.controls[key].addEventListener("change", () => {
+    syncOutputs();
+    redrawLitPreview();
+  });
+}
+
+for (const key of ["ambientColor", "lightColor"]) {
+  el.controls[key].addEventListener("input", redrawLitPreview);
+  el.controls[key].addEventListener("change", redrawLitPreview);
+}
 
 el.input.addEventListener("change", () => loadFile(el.input.files[0]));
 el.sampleButton.addEventListener("click", loadSample);
@@ -668,6 +725,12 @@ el.exportButton.addEventListener("click", exportPng);
 for (const button of el.modeButtons) {
   button.addEventListener("click", () => {
     setMode(button.dataset.mode);
+  });
+}
+
+for (const button of el.controlTabButtons) {
+  button.addEventListener("click", () => {
+    setControlTab(button.dataset.controlTab);
   });
 }
 
