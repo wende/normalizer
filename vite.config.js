@@ -1,14 +1,21 @@
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import preact from "@preact/preset-vite";
 
 import treelocator from "@treelocator/vite";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)));
+
 export default defineConfig({
   root: "web",
-  // Allow Vite to serve ../laigter/images/* (sample.png, laigter_texture.png)
-  // — the browser fetches them as <img src="../laigter/..."> which falls
-  // outside Vite's `root` ("web/"). The custom Node server has a staticPath
-  // rule for /laigter/; Vite needs server.fs.allow to do the equivalent.
-  server: { fs: { allow: [".."] } },
+  resolve: {
+    alias: {
+      shared: resolve(repoRoot, "shared"),
+    },
+  },
+  // Allow Vite to serve files from the repo root (sample images etc.)
+  server: { fs: { allow: [repoRoot] } },
   plugins: [preact({
       babel: {
         plugins: [

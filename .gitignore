@@ -11,3 +11,4 @@ __pycache__/
 # Node
 node_modules/
 tests/golden/node/
+tests/golden/node-rerun/
