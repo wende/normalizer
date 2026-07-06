@@ -20,9 +20,9 @@
           </label>
           <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp">
           <button id="sampleButton" type="button">Sample</button>
-          <button id="aiCheckButton" type="button">Check AI</button>
-          <button id="aiGenerateButton" type="button">AI Augment</button>
-          <button id="clearAiButton" type="button">Clear AI</button>
+          <!-- <button id="aiCheckButton" type="button">Check AI</button> -->
+          <!-- <button id="aiGenerateButton" type="button">AI Augment</button> -->
+          <!-- <button id="clearAiButton" type="button">Clear AI</button> -->
           <button id="exportButton" type="button">Export PNG</button>
         </div>
       </header>
@@ -42,63 +42,108 @@
           <canvas id="previewCanvas" width="960" height="640"></canvas>
         </section>
 
-        <aside class="controls" aria-label="Normal controls">
-          <div class="panel-title">Render</div>
-
-          <div class="toggles preview-toggles">
-            <label><input id="pixelated" type="checkbox"> Pixelated</label>
-            <label><input id="toon" type="checkbox"> Toon</label>
+        <aside class="controls" aria-label="Controls">
+          <div class="control-tabs segmented" role="tablist" aria-label="Control panels">
+            <button class="active" type="button" role="tab" aria-selected="true" data-control-tab="light">Light</button>
+            <button type="button" role="tab" aria-selected="false" data-control-tab="normal">Normal</button>
           </div>
 
-          <label class="range-row">
-            <span>Light Height</span>
-            <input id="lightHeight" type="range" min="5" max="100" value="30">
-            <output for="lightHeight">30</output>
-          </label>
+          <div class="control-panel active" id="lightPanel" role="tabpanel" data-control-tab="light">
+            <div class="toggles preview-toggles">
+              <label><input id="pixelated" type="checkbox"> Pixelated</label>
+              <label><input id="toon" type="checkbox"> Toon</label>
+            </div>
 
-          <div class="panel-title">Normal</div>
+            <div class="subsection-title">Diffuse</div>
 
-          <label class="range-row">
-            <span>Depth</span>
-            <input id="normalDepth" type="range" min="0" max="4000" value="250">
-            <output for="normalDepth">250</output>
-          </label>
+            <label class="range-row">
+              <span>Intensity</span>
+              <input id="diffuseIntensity" type="range" min="0" max="400" value="60">
+              <output for="diffuseIntensity">60</output>
+            </label>
 
-          <label class="range-row">
-            <span>Blur</span>
-            <input id="normalBlur" type="range" min="0" max="40" value="6">
-            <output for="normalBlur">6</output>
-          </label>
+            <div class="subsection-title">Specular</div>
 
-          <label class="range-row">
-            <span>Bevel Depth</span>
-            <input id="biselDepth" type="range" min="0" max="4000" value="100">
-            <output for="biselDepth">100</output>
-          </label>
+            <label class="range-row">
+              <span>Intensity</span>
+              <input id="specularIntensity" type="range" min="0" max="400" value="60">
+              <output for="specularIntensity">60</output>
+            </label>
 
-          <label class="range-row">
-            <span>Bevel Width</span>
-            <input id="biselDistance" type="range" min="0" max="255" value="60">
-            <output for="biselDistance">60</output>
-          </label>
+            <label class="range-row">
+              <span>Scatter</span>
+              <input id="specularScatter" type="range" min="1" max="255" value="32">
+              <output for="specularScatter">32</output>
+            </label>
 
-          <label class="range-row">
-            <span>Bevel Blur</span>
-            <input id="biselBlur" type="range" min="0" max="40" value="10">
-            <output for="biselBlur">10</output>
-          </label>
+            <div class="subsection-title">Ambient</div>
 
-          <div class="toggles">
-            <label><input id="softBisel" type="checkbox" checked> Soft bevel</label>
-            <label><input id="invertX" type="checkbox"> Invert X</label>
-            <label><input id="invertY" type="checkbox"> Invert Y</label>
-            <label><input id="invertZ" type="checkbox"> Invert Z</label>
-            <label><input id="useAlpha" type="checkbox"> Use alpha</label>
+            <label class="range-row">
+              <span>Intensity</span>
+              <input id="ambientIntensity" type="range" min="0" max="100" value="80">
+              <output for="ambientIntensity">80</output>
+            </label>
+
+            <label class="color-row">
+              <span>Color</span>
+              <input id="ambientColor" type="color" value="#ffffff">
+            </label>
+
+            <label class="color-row">
+              <span>Light Color</span>
+              <input id="lightColor" type="color" value="#00ffb3">
+            </label>
+
+            <label class="range-row">
+              <span>Height</span>
+              <input id="lightHeight" type="range" min="-100" max="100" value="30">
+              <output for="lightHeight">30</output>
+            </label>
           </div>
 
-          <div class="panel-title">AI</div>
+          <div class="control-panel" id="normalPanel" role="tabpanel" data-control-tab="normal" hidden>
+            <label class="range-row">
+              <span>Depth</span>
+              <input id="normalDepth" type="range" min="0" max="4000" value="250">
+              <output for="normalDepth">250</output>
+            </label>
 
-          <label class="field-row">
+            <label class="range-row">
+              <span>Blur</span>
+              <input id="normalBlur" type="range" min="0" max="40" value="6">
+              <output for="normalBlur">6</output>
+            </label>
+
+            <label class="range-row">
+              <span>Bevel Depth</span>
+              <input id="biselDepth" type="range" min="0" max="4000" value="100">
+              <output for="biselDepth">100</output>
+            </label>
+
+            <label class="range-row">
+              <span>Bevel Width</span>
+              <input id="biselDistance" type="range" min="0" max="255" value="60">
+              <output for="biselDistance">60</output>
+            </label>
+
+            <label class="range-row">
+              <span>Bevel Blur</span>
+              <input id="biselBlur" type="range" min="0" max="40" value="10">
+              <output for="biselBlur">10</output>
+            </label>
+
+            <div class="toggles">
+              <label><input id="softBisel" type="checkbox" checked> Soft bevel</label>
+              <!-- <label><input id="invertX" type="checkbox"> Invert X</label> -->
+              <!-- <label><input id="invertY" type="checkbox"> Invert Y</label> -->
+              <!-- <label><input id="invertZ" type="checkbox"> Invert Z</label> -->
+              <label><input id="useAlpha" type="checkbox"> Use alpha</label>
+            </div>
+          </div>
+
+          <!-- <div class="panel-title">AI</div> -->
+
+          <!-- <label class="field-row">
             <span>uv</span>
             <input id="uvPath" type="text" value="uv" spellcheck="false">
           </label>
@@ -138,11 +183,11 @@
             <span>Blend</span>
             <input id="aiBlend" type="range" min="0" max="100" value="65">
             <output for="aiBlend">65</output>
-          </label>
+          </label> -->
         </aside>
       </section>
     </main>
 
-    <script src="app.js?v=ai-normalcy-5"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

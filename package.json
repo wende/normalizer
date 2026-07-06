@@ -1,0 +1,18 @@
+{
+  "name": "normalizer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Laigter-derived normal/texture-map generator with a dependency-free JS core shared by the browser app and a Node CLI.",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "pngjs": "^7.0.0",
+    "preact": "^10.22.0",
+    "vite": "^5.4.0"
+  },
+  "devDependencies": {
+    "@locator/babel-jsx": "^0.5.1",
+    "@treelocator/runtime": "file:../treelocatorjs/packages/runtime",
+    "@treelocator/vite": "file:../treelocatorjs/packages/vite"
+  }
+}

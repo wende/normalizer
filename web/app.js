@@ -1,3 +1,7 @@
+import { rgbaOffset } from "../shared/image.js";
+import { generateNormalMap } from "../shared/normal.js";
+import { buildLitPreview } from "../shared/preview.js";
+
 const state = {
   source: null,
   normal: null,
@@ -26,6 +30,8 @@ const el = {
   canvas: document.querySelector("#previewCanvas"),
   status: document.querySelector("#status"),
   modeButtons: [...document.querySelectorAll("[data-mode]")],
+  controlTabButtons: [...document.querySelectorAll("[data-control-tab]")].filter((button) => button.closest(".control-tabs")),
+  controlPanels: [...document.querySelectorAll(".control-panel")],
   controls: {
     normalDepth: document.querySelector("#normalDepth"),
     normalBlur: document.querySelector("#normalBlur"),
@@ -39,6 +45,12 @@ const el = {
     useAlpha: document.querySelector("#useAlpha"),
     pixelated: document.querySelector("#pixelated"),
     toon: document.querySelector("#toon"),
+    diffuseIntensity: document.querySelector("#diffuseIntensity"),
+    specularIntensity: document.querySelector("#specularIntensity"),
+    specularScatter: document.querySelector("#specularScatter"),
+    ambientIntensity: document.querySelector("#ambientIntensity"),
+    ambientColor: document.querySelector("#ambientColor"),
+    lightColor: document.querySelector("#lightColor"),
     lightHeight: document.querySelector("#lightHeight"),
     uvPath: document.querySelector("#uvPath"),
     aiDevice: document.querySelector("#aiDevice"),
@@ -63,9 +75,10 @@ function params() {
     biselDistance: Number(el.controls.biselDistance.value),
     biselBlurRadius: Number(el.controls.biselBlur.value),
     softBisel: el.controls.softBisel.checked,
-    invertX: el.controls.invertX.checked,
-    invertY: el.controls.invertY.checked,
-    invertZ: el.controls.invertZ.checked,
+    // Invert controls are commented out in the UI
+    invertX: false,
+    invertY: false,
+    invertZ: false,
     useAlpha: el.controls.useAlpha.checked,
   };
 }
@@ -78,21 +91,43 @@ function previewParams() {
 }
 
 function aiParams() {
+  // AI controls are commented out in the UI; return safe defaults.
   return {
-    uvPath: el.controls.uvPath.value.trim() || "uv",
-    device: el.controls.aiDevice.value,
-    modelSize: el.controls.aiModelSize.value,
-    volume: Number(el.controls.aiVolume.value),
-    extrude: Number(el.controls.aiExtrude.value),
-    blend: Number(el.controls.aiBlend.value) / 100,
+    uvPath: "uv",
+    device: "auto",
+    modelSize: "vits",
+    volume: 1,
+    extrude: 4,
+    blend: 0.65,
   };
 }
 
+function hexToRgb01(hex) {
+  const value = hex.replace("#", "");
+  const full = value.length === 3
+    ? value.split("").map((ch) => ch + ch).join("")
+    : value;
+  const int = Number.parseInt(full, 16);
+  return [
+    ((int >> 16) & 255) / 255,
+    ((int >> 8) & 255) / 255,
+    (int & 255) / 255,
+  ];
+}
+
 function currentLight() {
+  const color = hexToRgb01(el.controls.lightColor.value);
   return {
     x: state.light.x,
     y: state.light.y,
     z: Number(el.controls.lightHeight.value) / 100,
+    diffuseColor: color,
+    diffuseIntensity: Number(el.controls.diffuseIntensity.value) / 100,
+    specularColor: color,
+    specularIntensity: Number(el.controls.specularIntensity.value) / 100,
+    specularScatter: Number(el.controls.specularScatter.value),
+    ambientColor: hexToRgb01(el.controls.ambientColor.value),
+    ambientIntensity: Number(el.controls.ambientIntensity.value) / 100,
   };
 }
 
@@ -112,7 +147,7 @@ function invalidateLit() {
 
 function syncOutputs() {
   for (const input of Object.values(el.controls)) {
-    if (input.type !== "range") {
+    if (!input || input.type !== "range") {
       continue;
     }
     const output = input.parentElement.querySelector("output");
@@ -139,6 +174,19 @@ function setMode(mode) {
   drawPreview();
 }
 
+function setControlTab(tab) {
+  for (const button of el.controlTabButtons) {
+    const active = button.dataset.controlTab === tab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  for (const panel of el.controlPanels) {
+    const active = panel.dataset.controlTab === tab;
+    panel.classList.toggle("active", active);
+    panel.hidden = !active;
+  }
+}
+
 function storeAiSettings() {
   localStorage.setItem("normalizer.ai", JSON.stringify(aiParams()));
 }
@@ -155,10 +203,6 @@ function restoreAiSettings() {
   } catch {
     localStorage.removeItem("normalizer.ai");
   }
-}
-
-function rgbaOffset(width, x, y) {
-  return (y * width + x) * 4;
 }
 
 function readSourceFromImage(image) {
@@ -238,231 +282,9 @@ async function loadFile(file) {
   }
 }
 
-function grayscaleFromRgba(image) {
-  const out = new Float32Array(image.width * image.height);
-  for (let i = 0, p = 0; i < out.length; i += 1, p += 4) {
-    const alpha = image.data[p + 3];
-    const r = alpha === 0 ? 0 : image.data[p];
-    const g = alpha === 0 ? 0 : image.data[p + 1];
-    const b = alpha === 0 ? 0 : image.data[p + 2];
-    out[i] = Math.floor((11 * r + 16 * g + 5 * b) / 32);
-  }
-  return out;
-}
-
-function edt1d(f, n) {
-  const d = new Float32Array(n);
-  const v = new Int32Array(n);
-  const z = new Float32Array(n + 1);
-  let k = 0;
-  v[0] = 0;
-  z[0] = -Infinity;
-  z[1] = Infinity;
-
-  for (let q = 1; q < n; q += 1) {
-    let s = 0;
-    do {
-      const vk = v[k];
-      s = ((f[q] + q * q) - (f[vk] + vk * vk)) / (2 * q - 2 * vk);
-      if (s <= z[k]) {
-        k -= 1;
-      }
-    } while (s <= z[k]);
-    k += 1;
-    v[k] = q;
-    z[k] = s;
-    z[k + 1] = Infinity;
-  }
-
-  k = 0;
-  for (let q = 0; q < n; q += 1) {
-    while (z[k + 1] < q) {
-      k += 1;
-    }
-    const dx = q - v[k];
-    d[q] = dx * dx + f[v[k]];
-  }
-
-  return d;
-}
-
-function alphaDistance(image) {
-  const width = image.width;
-  const height = image.height;
-  const inf = 1e20;
-  const grid = new Float32Array(width * height);
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const i = y * width + x;
-      const a = image.data[rgbaOffset(width, x, y) + 3];
-      grid[i] = a > 0 && x > 0 && y > 0 && x < width - 1 && y < height - 1 ? inf : 0;
-    }
-  }
-
-  const temp = new Float32Array(width * height);
-  const column = new Float32Array(height);
-  for (let x = 0; x < width; x += 1) {
-    for (let y = 0; y < height; y += 1) {
-      column[y] = grid[y * width + x];
-    }
-    const d = edt1d(column, height);
-    for (let y = 0; y < height; y += 1) {
-      temp[y * width + x] = d[y];
-    }
-  }
-
-  const out = new Float32Array(width * height);
-  const row = new Float32Array(width);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      row[x] = temp[y * width + x];
-    }
-    const d = edt1d(row, width);
-    for (let x = 0; x < width; x += 1) {
-      out[y * width + x] = Math.sqrt(d[x]);
-    }
-  }
-
-  return out;
-}
-
-function gaussianBlur(input, width, height, radius) {
-  const sigma = radius / 3;
-  if (sigma <= 0.01) {
-    return new Float32Array(input);
-  }
-
-  const kernelRadius = Math.max(1, Math.ceil(sigma * 3));
-  const kernel = new Float32Array(kernelRadius * 2 + 1);
-  let total = 0;
-  for (let i = -kernelRadius; i <= kernelRadius; i += 1) {
-    const weight = Math.exp(-(i * i) / (2 * sigma * sigma));
-    kernel[i + kernelRadius] = weight;
-    total += weight;
-  }
-  for (let i = 0; i < kernel.length; i += 1) {
-    kernel[i] /= total;
-  }
-
-  const temp = new Float32Array(width * height);
-  const out = new Float32Array(width * height);
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      let sum = 0;
-      for (let k = -kernelRadius; k <= kernelRadius; k += 1) {
-        const sx = Math.max(0, Math.min(width - 1, x + k));
-        sum += input[y * width + sx] * kernel[k + kernelRadius];
-      }
-      temp[y * width + x] = sum;
-    }
-  }
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      let sum = 0;
-      for (let k = -kernelRadius; k <= kernelRadius; k += 1) {
-        const sy = Math.max(0, Math.min(height - 1, y + k));
-        sum += temp[sy * width + x] * kernel[k + kernelRadius];
-      }
-      out[y * width + x] = sum;
-    }
-  }
-
-  return out;
-}
-
-function calculateNormal(height, alpha, width, heightPx, depth, blurRadius, p) {
-  const img = gaussianBlur(height, width, heightPx, blurRadius);
-  const out = new Float32Array(width * heightPx * 3);
-  const scale = depth / 100;
-  const invertX = p.invertX ? -1 : 1;
-  const invertY = p.invertY ? -1 : 1;
-  const sample = (x, y) => img[Math.max(0, Math.min(heightPx - 1, y)) * width + Math.max(0, Math.min(width - 1, x))];
-
-  for (let y = 0; y < heightPx; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const i = y * width + x;
-      const oi = i * 3;
-      if (alpha[i] === 0) {
-        out[oi] = 0;
-        out[oi + 1] = 0;
-        out[oi + 2] = 1;
-        continue;
-      }
-
-      let dx = 0;
-      if (x === 0) {
-        dx = -3 * sample(x, y) + 4 * sample(x + 1, y) - sample(x + 2, y);
-      } else if (x === width - 1) {
-        dx = 3 * sample(x, y) - 4 * sample(x - 1, y) + sample(x - 2, y);
-      } else {
-        dx = -sample(x - 1, y) + sample(x + 1, y);
-      }
-
-      let dy = 0;
-      if (y === 0) {
-        dy = -3 * sample(x, y) + 4 * sample(x, y + 1) - sample(x, y + 2);
-      } else if (y === heightPx - 1) {
-        dy = 3 * sample(x, y) - 4 * sample(x, y - 1) + sample(x, y - 2);
-      } else {
-        dy = -sample(x, y - 1) + sample(x, y + 1);
-      }
-
-      out[oi] = -(dx / 255) * scale * invertX;
-      out[oi + 1] = (dy / 255) * scale * invertY;
-      out[oi + 2] = 1;
-    }
-  }
-
-  return out;
-}
-
-function generateNormalMap(source, p) {
-  const width = source.width;
-  const height = source.height;
-  const gray = grayscaleFromRgba(source);
-  const alpha = new Uint8Array(width * height);
-  const embossHeight = new Float32Array(width * height);
-
-  for (let i = 0, px = 0; i < alpha.length; i += 1, px += 4) {
-    alpha[i] = source.data[px + 3] > 0 ? 1 : 0;
-    embossHeight[i] = gray[i] * 10;
-  }
-
-  const distance = alphaDistance(source);
-  const bevel = new Float32Array(width * height);
-  for (let i = 0; i < bevel.length; i += 1) {
-    let d = p.biselDistance !== 0 ? distance[i] * 255 / p.biselDistance : (distance[i] > 0.1 ? 255 : 0);
-    d = Math.max(0, Math.min(255, d));
-    if (p.softBisel) {
-      d = Math.sqrt(1 - (d / 255 - 1) ** 2) * 255;
-    }
-    bevel[i] = d;
-  }
-
-  const zeroHeight = new Float32Array(width * height);
-  const emboss = calculateNormal(embossHeight, alpha, width, height, p.normalDepth, p.normalBlurRadius, p);
-  const bump = calculateNormal(bevel, alpha, width, height, p.biselDepth * p.biselDistance, p.biselBlurRadius, p);
-  const heightOverlay = calculateNormal(zeroHeight, alpha, width, height, 5000, 0, p);
-  const normal = new ImageData(width, height);
-  const invertZ = p.invertZ ? -1 : 1;
-
-  for (let i = 0, px = 0, ni = 0; i < alpha.length; i += 1, px += 4, ni += 3) {
-    const nr = emboss[ni] * 1.5 + bump[ni] * 1.5 + heightOverlay[ni];
-    const ng = emboss[ni + 1] * 1.5 + bump[ni + 1] * 1.5 + heightOverlay[ni + 1];
-    const nb = (emboss[ni + 2] * 1.5 + bump[ni + 2] * 1.5 + heightOverlay[ni + 2]) * invertZ;
-    const len = Math.hypot(nr, ng, nb) || 1;
-    normal.data[px] = Math.max(0, Math.min(255, 255 * (nr / len * 0.5 + 0.5))) | 0;
-    normal.data[px + 1] = Math.max(0, Math.min(255, 255 * (ng / len * 0.5 + 0.5))) | 0;
-    normal.data[px + 2] = Math.max(0, Math.min(255, 255 * (nb / len * 0.5 + 0.5))) | 0;
-    normal.data[px + 3] = p.useAlpha ? source.data[px + 3] : 255;
-  }
-
-  return blendNormalOverlay(normal, source);
-}
-
+// Linear blend in tangent space between the generated base normal and the AI
+// overlay (state.aiOverlay), weighted by the AI blend control. Stays UI-side
+// because it reads DOM/state the shared generator has no knowledge of.
 function blendNormalOverlay(base, source) {
   if (!state.aiOverlay || state.aiOverlay.width !== base.width || state.aiOverlay.height !== base.height) {
     return base;
@@ -497,59 +319,24 @@ function blendNormalOverlay(base, source) {
   return out;
 }
 
-function smoothstep(edge0, edge1, value) {
-  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
-function buildLitPreview(source, normal, toon) {
-  const width = source.width;
-  const height = source.height;
-  const lit = new ImageData(width, height);
-  const light = currentLight();
-  const lightZ = light.z * 1000;
-  const centerX = width * 0.5;
-  const centerY = height * 0.5;
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const px = rgbaOffset(width, x, y);
-      const nx = normal.data[px] / 127.5 - 1;
-      const ny = normal.data[px + 1] / 127.5 - 1;
-      const nz = normal.data[px + 2] / 127.5 - 1;
-      const fx = x + 0.5 - centerX;
-      const fy = centerY - y - 0.5;
-      const lx = light.x - fx;
-      const ly = light.y - fy;
-      const len = Math.hypot(lx, ly, lightZ) || 1;
-      let diffuse = Math.max(0, nx * (lx / len) + ny * (ly / len) + nz * (lightZ / len));
-      // Mirrors laigter/shaders/fshader.glsl toon diffuse threshold.
-      if (toon) {
-        diffuse = smoothstep(0.495, 0.505, diffuse);
-      }
-      const shade = 0.28 + diffuse * 0.86;
-
-      lit.data[px] = Math.max(0, Math.min(255, source.data[px] * shade)) | 0;
-      lit.data[px + 1] = Math.max(0, Math.min(255, source.data[px + 1] * shade)) | 0;
-      lit.data[px + 2] = Math.max(0, Math.min(255, source.data[px + 2] * shade)) | 0;
-      lit.data[px + 3] = source.data[px + 3];
-    }
-  }
-
-  return lit;
+// Local DOM wrapper — shared/preview.js returns a plain {width,height,data}
+// record; cache it as an ImageData for the canvas code below.
+function renderLit(source, normal, toon) {
+  const out = buildLitPreview(source, normal, currentLight(), toon);
+  return new ImageData(out.data, out.width, out.height);
 }
 
 function litPreview() {
   const { toon } = previewParams();
   if (toon) {
     if (!state.litToon) {
-      state.litToon = buildLitPreview(state.source, state.normal, true);
+      state.litToon = renderLit(state.source, state.normal, true);
     }
     return state.litToon;
   }
 
   if (!state.lit) {
-    state.lit = buildLitPreview(state.source, state.normal, false);
+    state.lit = renderLit(state.source, state.normal, false);
   }
   return state.lit;
 }
@@ -690,7 +477,10 @@ function generateAndDraw() {
     return;
   }
   const start = performance.now();
-  state.normal = generateNormalMap(state.source, params());
+  // shared/ returns a plain { width, height, data } record; wrap it as ImageData
+  // at the boundary, then apply the UI-side AI overlay blend.
+  const base = generateNormalMap(state.source, params());
+  state.normal = blendNormalOverlay(new ImageData(base.data, base.width, base.height), state.source);
   state.lit = null;
   state.litToon = null;
   drawPreview();
@@ -901,55 +691,80 @@ el.canvas.addEventListener("pointerleave", (event) => {
   }
 });
 
+const LIGHT_PREVIEW_CONTROLS = [
+  "pixelated",
+  "toon",
+  "diffuseIntensity",
+  "specularIntensity",
+  "specularScatter",
+  "ambientIntensity",
+  "ambientColor",
+  "lightColor",
+  "lightHeight",
+];
+
 for (const [key, input] of Object.entries(el.controls)) {
-  if (
-    key === "pixelated" ||
-    key === "toon" ||
-    key === "lightHeight" ||
-    key === "uvPath" ||
-    key === "aiDevice" ||
-    key === "aiModelSize" ||
-    key === "aiVolume" ||
-    key === "aiExtrude"
-  ) {
+  if (LIGHT_PREVIEW_CONTROLS.includes(key)) {
     continue;
   }
+  if (!input) continue;
   input.addEventListener("input", debounceGenerate);
   input.addEventListener("change", debounceGenerate);
 }
 
-for (const key of ["uvPath", "aiDevice", "aiModelSize", "aiVolume", "aiExtrude"]) {
-  el.controls[key].addEventListener("change", () => {
-    syncOutputs();
-    storeAiSettings();
-  });
-}
+// for (const key of ["uvPath", "aiDevice", "aiModelSize", "aiVolume", "aiExtrude"]) {
+//   el.controls[key].addEventListener("change", () => {
+//     syncOutputs();
+//     storeAiSettings();
+//   });
+// }
 
-el.controls.aiBlend.addEventListener("change", storeAiSettings);
+// el.controls.aiBlend.addEventListener("change", storeAiSettings);
 
 el.controls.pixelated.addEventListener("change", drawPreview);
 el.controls.toon.addEventListener("change", () => {
   redrawLitPreview();
 });
-el.controls.lightHeight.addEventListener("input", () => {
-  syncOutputs();
-  redrawLitPreview();
-});
-el.controls.lightHeight.addEventListener("change", () => {
-  syncOutputs();
-  redrawLitPreview();
-});
+
+for (const key of [
+  "diffuseIntensity",
+  "specularIntensity",
+  "specularScatter",
+  "ambientIntensity",
+  "lightHeight",
+]) {
+  el.controls[key].addEventListener("input", () => {
+    syncOutputs();
+    redrawLitPreview();
+  });
+  el.controls[key].addEventListener("change", () => {
+    syncOutputs();
+    redrawLitPreview();
+  });
+}
+
+for (const key of ["ambientColor", "lightColor"]) {
+  el.controls[key].addEventListener("input", redrawLitPreview);
+  el.controls[key].addEventListener("change", redrawLitPreview);
+}
 
 el.input.addEventListener("change", () => loadFile(el.input.files[0]));
 el.sampleButton.addEventListener("click", loadSample);
-el.aiCheckButton.addEventListener("click", checkAiBackend);
-el.aiGenerateButton.addEventListener("click", generateAiOverlay);
-el.clearAiButton.addEventListener("click", clearAiOverlay);
+// AI buttons commented out in the UI
+// el.aiCheckButton.addEventListener("click", checkAiBackend);
+// el.aiGenerateButton.addEventListener("click", generateAiOverlay);
+// el.clearAiButton.addEventListener("click", clearAiOverlay);
 el.exportButton.addEventListener("click", exportPng);
 
 for (const button of el.modeButtons) {
   button.addEventListener("click", () => {
     setMode(button.dataset.mode);
+  });
+}
+
+for (const button of el.controlTabButtons) {
+  button.addEventListener("click", () => {
+    setControlTab(button.dataset.controlTab);
   });
 }
 
