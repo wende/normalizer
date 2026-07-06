@@ -56,7 +56,7 @@ const el = {
 const ctx = el.canvas.getContext("2d", { alpha: false });
 const lightSprite = new Image();
 lightSprite.decoding = "async";
-lightSprite.src = "../laigter/images/laigter_texture.png";
+lightSprite.src = "./laigter_texture.png";
 lightSprite.addEventListener("load", drawPreview);
 
 function params() {
@@ -174,47 +174,13 @@ function readSourceFromImage(image) {
   return sourceCtx.getImageData(0, 0, width, height);
 }
 
-function generatedSample() {
-  const width = 256;
-  const height = 256;
-  const image = new ImageData(width, height);
-  const cx = width * 0.48;
-  const cy = height * 0.5;
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const dx = (x - cx) / 92;
-      const dy = (y - cy) / 86;
-      const skull = dx * dx + dy * dy < 1;
-      const jaw = x > 88 && x < 178 && y > 138 && y < 202;
-      const eye = ((x - 112) ** 2) / 360 + ((y - 104) ** 2) / 190 < 1 ||
-        ((x - 156) ** 2) / 330 + ((y - 105) ** 2) / 190 < 1;
-      const nose = Math.abs(x - 135) < 13 && y > 110 && y < 146;
-      const teeth = y > 169 && y < 181 && x > 92 && x < 174 && x % 13 < 8;
-      const inside = (skull || jaw) && !eye && !nose;
-      const offset = rgbaOffset(width, x, y);
-      const shade = Math.max(0, Math.min(255, 190 + (x - y) * 0.28));
-      image.data[offset + 0] = teeth ? 238 : shade;
-      image.data[offset + 1] = teeth ? 236 : shade - 20;
-      image.data[offset + 2] = teeth ? 215 : shade - 42;
-      image.data[offset + 3] = inside || teeth ? 255 : 0;
-    }
-  }
-
-  return image;
-}
-
 async function loadSample() {
   setStatus("Loading sample");
   const image = new Image();
   image.decoding = "async";
-  image.src = "../laigter/images/sample.png";
-  try {
-    await image.decode();
-    state.source = readSourceFromImage(image);
-  } catch {
-    state.source = generatedSample();
-  }
+  image.src = "./sample.png";
+  await image.decode();
+  state.source = readSourceFromImage(image);
   state.aiOverlay = null;
   resetLightPosition();
   generateAndDraw();
