@@ -78,6 +78,84 @@
         "max_channel_delta": 2,
         "max_pixels_over_tolerance": 0
       }
+    },
+    {
+      "id": "preview_sample_center",
+      "enabled": true,
+      "map": "preview",
+      "input": "laigter/images/sample.png",
+      "params": {},
+      "light": { "x": 0, "y": 0, "z": 0.5 },
+      "toon": false,
+      "tolerance": {
+        "max_channel_delta": 4,
+        "max_pixels_over_tolerance": 32
+      }
+    },
+    {
+      "id": "preview_sample_corner",
+      "enabled": true,
+      "map": "preview",
+      "input": "laigter/images/sample.png",
+      "params": {},
+      "light": { "x": -120, "y": 80, "z": 0.2 },
+      "toon": false,
+      "tolerance": {
+        "max_channel_delta": 4,
+        "max_pixels_over_tolerance": 32
+      }
+    },
+    {
+      "id": "preview_opaque_gradient_highlight",
+      "enabled": true,
+      "map": "preview",
+      "input": "tests/fixtures/inputs/generated/opaque_gradient.png",
+      "params": {},
+      "light": { "x": 0, "y": 0, "z": 0.8 },
+      "toon": false,
+      "tolerance": {
+        "max_channel_delta": 4,
+        "max_pixels_over_tolerance": 32
+      }
+    },
+    {
+      "id": "preview_alpha_badge_corner",
+      "enabled": true,
+      "map": "preview",
+      "input": "tests/fixtures/inputs/generated/alpha_badge.png",
+      "params": {},
+      "light": { "x": 30, "y": -20, "z": 0.5 },
+      "toon": false,
+      "tolerance": {
+        "max_channel_delta": 4,
+        "max_pixels_over_tolerance": 32
+      }
+    },
+    {
+      "id": "preview_pixel_blocks_toon",
+      "enabled": true,
+      "map": "preview",
+      "input": "tests/fixtures/inputs/generated/pixel_blocks.png",
+      "params": {},
+      "light": { "x": 0, "y": 0, "z": 0.4 },
+      "toon": true,
+      "tolerance": {
+        "max_channel_delta": 4,
+        "max_pixels_over_tolerance": 32
+      }
+    },
+    {
+      "id": "preview_hard_edges_center",
+      "enabled": true,
+      "map": "preview",
+      "input": "tests/fixtures/inputs/generated/hard_edges.png",
+      "params": {},
+      "light": { "x": 0, "y": 0, "z": 0.5 },
+      "toon": false,
+      "tolerance": {
+        "max_channel_delta": 4,
+        "max_pixels_over_tolerance": 32
+      }
     }
   ]
 }

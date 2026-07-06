@@ -49,7 +49,10 @@ def run_case(repo: Path, cli: Path, case: dict, out_dir: Path) -> None:
     if not case.get("enabled", True):
         return
     if case.get("map") != "normal":
-        raise RuntimeError(f"{case['id']}: current MVP runner only supports normal maps")
+        # Preview cases are driven by scripts/run_preview_cases.js — see the
+        # Makefile `preview-goldens` target. This script is the normal-map
+        # runner only.
+        return
 
     input_path = repo / case["input"]
     output_path = out_dir / output_name(case, "normal")

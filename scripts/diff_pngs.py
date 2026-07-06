@@ -65,6 +65,7 @@ def main() -> int:
     parser.add_argument("--expected-dir", default="tests/golden/upstream")
     parser.add_argument("--actual-dir", default="tests/golden/current")
     parser.add_argument("--case", dest="case_id")
+    parser.add_argument("--map", dest="map_name", help="only run cases with this map type")
     args = parser.parse_args()
 
     repo = Path.cwd()
@@ -74,6 +75,10 @@ def main() -> int:
         cases = [case for case in cases if case["id"] == args.case_id]
         if not cases:
             raise RuntimeError(f"unknown case: {args.case_id}")
+    if args.map_name:
+        cases = [case for case in cases if case.get("map") == args.map_name]
+        if not cases:
+            raise RuntimeError(f"no cases with map: {args.map_name}")
 
     failures = 0
     for case in cases:
@@ -88,10 +93,16 @@ def main() -> int:
 
         if not expected_path.exists():
             failures += 1
-            print(
-                f"FAIL {case['id']}: missing upstream golden {expected_path}. "
+            hint = (
                 "Run make regenerate-goldens UPSTREAM_LAIGTER=/path/to/laigter."
+                if map_name == "normal"
+                else (
+                    "Capture via the Laigter GUI: open the source image, set the "
+                    "light per case['light'], View Mode=Preview, File>Export "
+                    "Preview to the expected path."
+                )
             )
+            print(f"FAIL {case['id']}: missing upstream {map_name} golden {expected_path}. {hint}")
             continue
         if not actual_path.exists():
             failures += 1
