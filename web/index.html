@@ -20,6 +20,8 @@
           </label>
           <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp">
           <button id="sampleButton" type="button">Sample</button>
+          <button id="aiCheckButton" type="button">Check AI</button>
+          <button id="aiGenerateButton" type="button">AI Augment</button>
           <button id="exportButton" type="button">Export PNG</button>
         </div>
       </header>
@@ -91,6 +93,50 @@
             <label><input id="invertZ" type="checkbox"> Invert Z</label>
             <label><input id="useAlpha" type="checkbox"> Use alpha</label>
           </div>
+
+          <div class="panel-title">AI</div>
+
+          <label class="field-row">
+            <span>uv</span>
+            <input id="uvPath" type="text" value="uv" spellcheck="false">
+          </label>
+
+          <label class="field-row">
+            <span>Device</span>
+            <select id="aiDevice">
+              <option value="auto" selected>auto</option>
+              <option value="cpu">cpu</option>
+              <option value="coreml">coreml</option>
+              <option value="cuda">cuda</option>
+            </select>
+          </label>
+
+          <label class="field-row">
+            <span>Model</span>
+            <select id="aiModelSize">
+              <option value="vits" selected>vits</option>
+              <option value="vitb">vitb</option>
+              <option value="vitl">vitl</option>
+            </select>
+          </label>
+
+          <label class="range-row">
+            <span>Volume</span>
+            <input id="aiVolume" type="range" min="0.1" max="3" value="1" step="0.1">
+            <output for="aiVolume">1</output>
+          </label>
+
+          <label class="range-row">
+            <span>Extrude</span>
+            <input id="aiExtrude" type="range" min="0" max="64" value="4">
+            <output for="aiExtrude">4</output>
+          </label>
+
+          <label class="range-row">
+            <span>Blend</span>
+            <input id="aiBlend" type="range" min="0" max="100" value="65">
+            <output for="aiBlend">65</output>
+          </label>
         </aside>
       </section>
     </main>

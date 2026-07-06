@@ -23,7 +23,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -103,6 +104,11 @@ button:hover,
   color: #ffffff;
 }
 
+#aiGenerateButton {
+  border-color: #4c5ed7;
+  color: #29389e;
+}
+
 .workspace {
   min-height: 0;
   display: grid;
@@ -178,7 +184,8 @@ button:hover,
 }
 
 .panel-title + .panel-title,
-.preview-toggles + .panel-title {
+.preview-toggles + .panel-title,
+.toggles + .panel-title {
   margin-top: 24px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
@@ -203,6 +210,27 @@ button:hover,
   color: var(--ink);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.field-row input,
+.field-row select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0 9px;
 }
 
 .toggles {

@@ -1,10 +1,12 @@
 const state = {
   source: null,
   normal: null,
+  aiOverlay: null,
   lit: null,
   litToon: null,
   mode: "split",
   renderTimer: 0,
+  aiRunning: false,
   lastRect: null,
   draggingLight: false,
   light: {
@@ -16,6 +18,8 @@ const state = {
 const el = {
   input: document.querySelector("#imageInput"),
   sampleButton: document.querySelector("#sampleButton"),
+  aiCheckButton: document.querySelector("#aiCheckButton"),
+  aiGenerateButton: document.querySelector("#aiGenerateButton"),
   exportButton: document.querySelector("#exportButton"),
   canvas: document.querySelector("#previewCanvas"),
   status: document.querySelector("#status"),
@@ -34,6 +38,12 @@ const el = {
     pixelated: document.querySelector("#pixelated"),
     toon: document.querySelector("#toon"),
     lightHeight: document.querySelector("#lightHeight"),
+    uvPath: document.querySelector("#uvPath"),
+    aiDevice: document.querySelector("#aiDevice"),
+    aiModelSize: document.querySelector("#aiModelSize"),
+    aiVolume: document.querySelector("#aiVolume"),
+    aiExtrude: document.querySelector("#aiExtrude"),
+    aiBlend: document.querySelector("#aiBlend"),
   },
 };
 
@@ -62,6 +72,17 @@ function previewParams() {
   return {
     pixelated: el.controls.pixelated.checked,
     toon: el.controls.toon.checked,
+  };
+}
+
+function aiParams() {
+  return {
+    uvPath: el.controls.uvPath.value.trim() || "uv",
+    device: el.controls.aiDevice.value,
+    modelSize: el.controls.aiModelSize.value,
+    volume: Number(el.controls.aiVolume.value),
+    extrude: Number(el.controls.aiExtrude.value),
+    blend: Number(el.controls.aiBlend.value) / 100,
   };
 }
 
@@ -106,6 +127,24 @@ function debounceGenerate() {
 
 function setStatus(text) {
   el.status.textContent = text;
+}
+
+function storeAiSettings() {
+  localStorage.setItem("normalizer.ai", JSON.stringify(aiParams()));
+}
+
+function restoreAiSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("normalizer.ai") || "{}");
+    if (saved.uvPath) el.controls.uvPath.value = saved.uvPath;
+    if (saved.device) el.controls.aiDevice.value = saved.device;
+    if (saved.modelSize) el.controls.aiModelSize.value = saved.modelSize;
+    if (Number.isFinite(saved.volume)) el.controls.aiVolume.value = saved.volume;
+    if (Number.isFinite(saved.extrude)) el.controls.aiExtrude.value = saved.extrude;
+    if (Number.isFinite(saved.blend)) el.controls.aiBlend.value = Math.round(saved.blend * 100);
+  } catch {
+    localStorage.removeItem("normalizer.ai");
+  }
 }
 
 function rgbaOffset(width, x, y) {
@@ -164,6 +203,7 @@ async function loadSample() {
   } catch {
     state.source = generatedSample();
   }
+  state.aiOverlay = null;
   resetLightPosition();
   generateAndDraw();
 }
@@ -180,6 +220,7 @@ async function loadFile(file) {
   try {
     await image.decode();
     state.source = readSourceFromImage(image);
+    state.aiOverlay = null;
     resetLightPosition();
     generateAndDraw();
   } finally {
@@ -190,7 +231,11 @@ async function loadFile(file) {
 function grayscaleFromRgba(image) {
   const out = new Float32Array(image.width * image.height);
   for (let i = 0, p = 0; i < out.length; i += 1, p += 4) {
-    out[i] = Math.round((299 * image.data[p] + 587 * image.data[p + 1] + 114 * image.data[p + 2]) / 1000);
+    const alpha = image.data[p + 3];
+    const r = alpha === 0 ? 0 : image.data[p];
+    const g = alpha === 0 ? 0 : image.data[p + 1];
+    const b = alpha === 0 ? 0 : image.data[p + 2];
+    out[i] = Math.floor((11 * r + 16 * g + 5 * b) / 32);
   }
   return out;
 }
@@ -405,7 +450,41 @@ function generateNormalMap(source, p) {
     normal.data[px + 3] = p.useAlpha ? source.data[px + 3] : 255;
   }
 
-  return normal;
+  return blendNormalOverlay(normal, source);
+}
+
+function blendNormalOverlay(base, source) {
+  if (!state.aiOverlay || state.aiOverlay.width !== base.width || state.aiOverlay.height !== base.height) {
+    return base;
+  }
+
+  const blend = aiParams().blend;
+  if (blend <= 0) {
+    return base;
+  }
+
+  const out = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
+  for (let px = 0; px < out.data.length; px += 4) {
+    if (source.data[px + 3] === 0) {
+      continue;
+    }
+
+    const br = out.data[px] / 127.5 - 1;
+    const bg = out.data[px + 1] / 127.5 - 1;
+    const bb = out.data[px + 2] / 127.5 - 1;
+    const ar = state.aiOverlay.data[px] / 127.5 - 1;
+    const ag = state.aiOverlay.data[px + 1] / 127.5 - 1;
+    const ab = state.aiOverlay.data[px + 2] / 127.5 - 1;
+    const nr = br * (1 - blend) + ar * blend;
+    const ng = bg * (1 - blend) + ag * blend;
+    const nb = bb * (1 - blend) + ab * blend;
+    const len = Math.hypot(nr, ng, nb) || 1;
+    out.data[px] = Math.max(0, Math.min(255, 255 * (nr / len * 0.5 + 0.5))) | 0;
+    out.data[px + 1] = Math.max(0, Math.min(255, 255 * (ng / len * 0.5 + 0.5))) | 0;
+    out.data[px + 2] = Math.max(0, Math.min(255, 255 * (nb / len * 0.5 + 0.5))) | 0;
+  }
+
+  return out;
 }
 
 function smoothstep(edge0, edge1, value) {
@@ -621,6 +700,120 @@ function exportPng() {
   a.click();
 }
 
+function assertAiServer() {
+  if (window.location.protocol === "file:") {
+    throw new Error("AI requires the local Node server. Run `node web/server.js` or `make web`.");
+  }
+}
+
+function aiSearchParams() {
+  const p = aiParams();
+  return new URLSearchParams({
+    uvPath: p.uvPath,
+    device: p.device,
+    modelSize: p.modelSize,
+    volume: String(p.volume),
+    extrude: String(p.extrude),
+  });
+}
+
+function sourcePngBlob() {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = state.source.width;
+    canvas.height = state.source.height;
+    canvas.getContext("2d").putImageData(state.source, 0, 0);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("Could not encode source image."));
+      }
+    }, "image/png");
+  });
+}
+
+async function imageDataFromBlob(blob) {
+  const image = new Image();
+  const url = URL.createObjectURL(blob);
+  try {
+    image.src = url;
+    await image.decode();
+    return readSourceFromImage(image);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function setAiRunning(running) {
+  state.aiRunning = running;
+  el.aiGenerateButton.disabled = running;
+  el.aiCheckButton.disabled = running;
+  el.aiGenerateButton.textContent = running ? "Generating..." : "AI Augment";
+}
+
+async function checkAiBackend() {
+  try {
+    assertAiServer();
+    storeAiSettings();
+    setStatus("Checking AI backend");
+    const response = await fetch(`/api/normalcy/doctor?${aiSearchParams()}`);
+    const result = await readApiResult(response);
+    if (!response.ok || !result.ok) {
+      throw new Error(result.output || "AI backend check failed.");
+    }
+    setStatus(result.output.trim().split("\n").pop() || "AI backend available");
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+async function generateAiOverlay() {
+  if (!state.source || state.aiRunning) {
+    return;
+  }
+
+  try {
+    assertAiServer();
+    storeAiSettings();
+    setAiRunning(true);
+    setStatus("Running AI normal generation");
+    const sourceBlob = await sourcePngBlob();
+    const response = await fetch(`/api/normalcy/generate?${aiSearchParams()}`, {
+      method: "POST",
+      headers: { "content-type": "image/png" },
+      body: sourceBlob,
+    });
+
+    if (!response.ok) {
+      const result = await readApiResult(response);
+      throw new Error(result.output || "AI generation failed.");
+    }
+
+    const overlay = await imageDataFromBlob(await response.blob());
+    if (overlay.width !== state.source.width || overlay.height !== state.source.height) {
+      throw new Error("AI normal map dimensions do not match the source image.");
+    }
+
+    state.aiOverlay = overlay;
+    generateAndDraw();
+    setStatus("AI normal overlay applied");
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    setAiRunning(false);
+  }
+}
+
+async function readApiResult(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+  const text = await response.text();
+  return { ok: false, output: text || `HTTP ${response.status} ${response.statusText}` };
+}
+
 function redrawLitPreview() {
   invalidateLit();
   drawPreview();
@@ -688,12 +881,30 @@ el.canvas.addEventListener("pointerleave", (event) => {
 });
 
 for (const [key, input] of Object.entries(el.controls)) {
-  if (key === "pixelated" || key === "toon" || key === "lightHeight") {
+  if (
+    key === "pixelated" ||
+    key === "toon" ||
+    key === "lightHeight" ||
+    key === "uvPath" ||
+    key === "aiDevice" ||
+    key === "aiModelSize" ||
+    key === "aiVolume" ||
+    key === "aiExtrude"
+  ) {
     continue;
   }
   input.addEventListener("input", debounceGenerate);
   input.addEventListener("change", debounceGenerate);
 }
+
+for (const key of ["uvPath", "aiDevice", "aiModelSize", "aiVolume", "aiExtrude"]) {
+  el.controls[key].addEventListener("change", () => {
+    syncOutputs();
+    storeAiSettings();
+  });
+}
+
+el.controls.aiBlend.addEventListener("change", storeAiSettings);
 
 el.controls.pixelated.addEventListener("change", drawPreview);
 el.controls.toon.addEventListener("change", () => {
@@ -710,6 +921,8 @@ el.controls.lightHeight.addEventListener("change", () => {
 
 el.input.addEventListener("change", () => loadFile(el.input.files[0]));
 el.sampleButton.addEventListener("click", loadSample);
+el.aiCheckButton.addEventListener("click", checkAiBackend);
+el.aiGenerateButton.addEventListener("click", generateAiOverlay);
 el.exportButton.addEventListener("click", exportPng);
 
 for (const button of el.modeButtons) {
@@ -724,5 +937,6 @@ for (const button of el.modeButtons) {
 
 window.addEventListener("resize", drawPreview);
 
+restoreAiSettings();
 syncOutputs();
 loadSample();
