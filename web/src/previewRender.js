@@ -62,7 +62,13 @@ export function canvasPointFromEvent(canvas, event) {
 export function pointHitsLight(point, light, source, rect) {
   if (!source || !rect) return false;
   const pos = lightToCanvas(light, source, rect);
-  return Math.hypot(point.x - pos.x, point.y - pos.y) <= lightHandleSize() * 0.58;
+  const half = lightHandleSize(window.devicePixelRatio || 1) * 0.5;
+  return (
+    point.x >= pos.x - half &&
+    point.x <= pos.x + half &&
+    point.y >= pos.y - half &&
+    point.y <= pos.y + half
+  );
 }
 
 // Linear blend in tangent space between the generated base normal and the AI

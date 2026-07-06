@@ -108,7 +108,6 @@ export function App() {
     pixelated: lightControls.pixelated,
     draggingLight: draggingLight.current,
     lightSprite: lightSprite.current,
-    lastRect: lastRect.current,
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
   }), [source, normal, litCache, litToon, aiOverlay, mode, light, lightControls]);
@@ -178,6 +177,7 @@ export function App() {
           drawArgs={drawArgs}
           onLightMove={onLightMove}
           lightSprite={lightSprite.current}
+          lastRectRef={lastRect}
         />
         <ControlsPanel
           tab={tab}

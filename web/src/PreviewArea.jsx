@@ -16,6 +16,7 @@ export function PreviewArea({
   drawArgs,
   onLightMove,
   lightSprite,
+  lastRectRef,
 }) {
   const canvasRef = useRef(null);
   const dragState = useRef({ dragging: false, pointerId: null });
@@ -47,7 +48,7 @@ export function PreviewArea({
 
   const handlePointerDown = (e) => {
     const point = eventPoint(e);
-    const rect = drawArgs.lastRect;
+    const rect = lastRectRef.current;
     const source = drawArgs.source;
     if (!source || !rect) return;
     if (!pointHitsLight(point, drawArgs.light, source, rect)) return;
@@ -62,7 +63,7 @@ export function PreviewArea({
     if (!dragState.current.dragging) {
       const point = eventPoint(e);
       const source = drawArgs.source;
-      const rect = drawArgs.lastRect;
+      const rect = lastRectRef.current;
       const hits = source && rect
         ? pointHitsLight(point, drawArgs.light, source, rect)
         : false;
