@@ -66,10 +66,11 @@ CImg<float> grayscale_from_rgba(const Image& image) {
   for (int y = 0; y < image.height; ++y) {
     for (int x = 0; x < image.width; ++x) {
       const std::size_t offset = rgba_offset(image.width, x, y);
-      const int r = image.rgba[offset + 0];
-      const int g = image.rgba[offset + 1];
-      const int b = image.rgba[offset + 2];
-      out(x, y) = static_cast<float>((299 * r + 587 * g + 114 * b + 500) / 1000);
+      const int alpha = image.rgba[offset + 3];
+      const int r = alpha == 0 ? 0 : image.rgba[offset + 0];
+      const int g = alpha == 0 ? 0 : image.rgba[offset + 1];
+      const int b = alpha == 0 ? 0 : image.rgba[offset + 2];
+      out(x, y) = static_cast<float>((11 * r + 16 * g + 5 * b) / 32);
     }
   }
   return out;

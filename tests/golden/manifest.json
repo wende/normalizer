@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "description": "Golden-output cases for validating the Laigter rewrite against upstream Laigter.",
+  "cases": [
+    {
+      "id": "sample_defaults",
+      "enabled": true,
+      "map": "normal",
+      "input": "laigter/images/sample.png",
+      "params": {},
+      "tolerance": {
+        "max_channel_delta": 2,
+        "max_pixels_over_tolerance": 0
+      }
+    },
+    {
+      "id": "opaque_gradient_defaults",
+      "enabled": true,
+      "map": "normal",
+      "input": "tests/fixtures/inputs/generated/opaque_gradient.png",
+      "params": {},
+      "tolerance": {
+        "max_channel_delta": 2,
+        "max_pixels_over_tolerance": 0
+      }
+    },
+    {
+      "id": "alpha_badge_defaults",
+      "enabled": true,
+      "map": "normal",
+      "input": "tests/fixtures/inputs/generated/alpha_badge.png",
+      "params": {},
+      "tolerance": {
+        "max_channel_delta": 2,
+        "max_pixels_over_tolerance": 0
+      }
+    },
+    {
+      "id": "pixel_blocks_defaults",
+      "enabled": true,
+      "map": "normal",
+      "input": "tests/fixtures/inputs/generated/pixel_blocks.png",
+      "params": {},
+      "tolerance": {
+        "max_channel_delta": 2,
+        "max_pixels_over_tolerance": 0
+      }
+    },
+    {
+      "id": "hard_edges_defaults",
+      "enabled": true,
+      "map": "normal",
+      "input": "tests/fixtures/inputs/generated/hard_edges.png",
+      "params": {},
+      "tolerance": {
+        "max_channel_delta": 2,
+        "max_pixels_over_tolerance": 0
+      }
+    },
+    {
+      "id": "soft_gradient_alpha_defaults",
+      "enabled": true,
+      "map": "normal",
+      "input": "tests/fixtures/inputs/generated/soft_gradient_alpha.png",
+      "params": {},
+      "tolerance": {
+        "max_channel_delta": 2,
+        "max_pixels_over_tolerance": 0
+      }
+    },
+    {
+      "id": "tiny_edges_defaults",
+      "enabled": true,
+      "map": "normal",
+      "input": "tests/fixtures/inputs/generated/tiny_edges.png",
+      "params": {},
+      "tolerance": {
+        "max_channel_delta": 2,
+        "max_pixels_over_tolerance": 0
+      }
+    }
+  ]
+}

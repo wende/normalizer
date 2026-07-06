@@ -1,1 +1,9 @@
 build/
+laigter/translations/*.qm
+tests/fixtures/inputs/generated/
+tests/golden/current/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
