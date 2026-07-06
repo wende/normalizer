@@ -1,0 +1,3 @@
+[submodule "laigter"]
+	path = laigter
+	url = https://github.com/azagaya/laigter.git
