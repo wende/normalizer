@@ -161,28 +161,28 @@ function drawLightHandle(ctx, light, source, rect, dragging, lightSprite) {
   ctx.restore();
 }
 
-// Empty-state message for the AI modes before DeepBump has been run.
-function drawAiPlaceholder(ctx, canvas, mode) {
+// Empty-state message shown in the AI pipeline before DeepBump has been run.
+function drawAiPlaceholder(ctx, canvas) {
   const ratio = window.devicePixelRatio || 1;
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
-  const title = mode === "ailit" ? "No AI map to light yet" : "No AI map generated yet";
-  const hint = 'Click "AI Normal" in the toolbar to run DeepBump';
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#c9d3ce";
   ctx.font = `600 ${Math.round(18 * ratio)}px system-ui, -apple-system, sans-serif`;
-  ctx.fillText(title, cx, cy - 12 * ratio);
+  ctx.fillText("No AI map generated yet", cx, cy - 12 * ratio);
   ctx.fillStyle = "#8b968f";
   ctx.font = `${Math.round(13 * ratio)}px system-ui, -apple-system, sans-serif`;
-  ctx.fillText(hint, cx, cy + 14 * ratio);
+  ctx.fillText("Open the AI tab and click Generate", cx, cy + 14 * ratio);
   ctx.restore();
 }
 
 /**
- * Draw the preview into the supplied canvas given the full UI state. Returns
- * the fitted rect used for layout (caller stores it for hit-testing).
+ * Draw the preview into the supplied canvas given the full UI state. `normal`
+ * is the active normal (procedural or AI depending on the pipeline); the two
+ * are never blended. Returns the fitted rect used for layout (caller stores it
+ * for hit-testing).
  */
 export function drawPreview({
   canvas,
@@ -190,10 +190,8 @@ export function drawPreview({
   source,
   normal,
   litCache,
-  litToonCache,
   mode,
-  aiOverlay,
-  aiLitCache,
+  pipeline,
   light,
   pixelated,
   draggingLight,
@@ -211,14 +209,18 @@ export function drawPreview({
   ctx.fillStyle = "#2a2f2c";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  if (!source || !normal) {
+  if (!source) {
     return null;
   }
 
-  // AI modes have nothing to show until DeepBump has run — show an empty-state
-  // hint instead of falling back to the procedural normal (which is confusing).
-  if ((mode === "ai" || mode === "ailit") && !aiOverlay) {
-    drawAiPlaceholder(ctx, canvas, mode);
+  // Only the Diffuse view can render without a normal map. Everything else
+  // needs one — and in the AI pipeline, "no normal yet" means "not generated",
+  // so show a hint rather than a blank (or a misleading procedural fallback).
+  const needsNormal = mode !== "diffuse";
+  if (needsNormal && !normal) {
+    if (pipeline === "ai") {
+      drawAiPlaceholder(ctx, canvas);
+    }
     return null;
   }
 
@@ -229,10 +231,6 @@ export function drawPreview({
     drawImageData(ctx, litCache || normal, rect, pixelated);
   } else if (mode === "normal") {
     drawImageData(ctx, normal, rect, pixelated);
-  } else if (mode === "ai") {
-    drawImageData(ctx, aiOverlay, rect, pixelated);
-  } else if (mode === "ailit") {
-    drawImageData(ctx, aiLitCache || aiOverlay, rect, pixelated);
   } else {
     drawImageData(ctx, source, rect, pixelated);
     ctx.save();

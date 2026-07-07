@@ -94,7 +94,8 @@ self.onmessage = async (e) => {
       image,
       msg.overlap || "LARGE",
       runTile,
-      onProgress
+      onProgress,
+      { denoise: msg.denoise || 0 }
     );
 
     // Transfer the pixel buffer back (zero-copy).

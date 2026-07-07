@@ -40,6 +40,13 @@ export const DEFAULT_AI = {
   blend: 65,
 };
 
+// Controls for the in-browser DeepBump pipeline (AI tab). `overlap` is the one
+// native DeepBump knob — tile stride / seam blending, not strength.
+export const DEFAULT_AI_CONTROLS = {
+  overlap: "LARGE", // "SMALL" | "MEDIUM" | "LARGE"
+  denoise: 1, // edge-preserving pre-filter radius (px); 0 = off. Tames JPEG artifacts.
+};
+
 export const AI_STORAGE_KEY = "normalizer.ai";
 
 export function buildNormalParams(controls) {

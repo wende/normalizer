@@ -2,23 +2,68 @@ import { RangeRow } from "./RangeRow.jsx";
 import { ToggleRow, ColorRow } from "./ToggleRow.jsx";
 import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL } from "./controls.js";
 
-const TABS = [
-  { id: "light", label: "Light" },
-  { id: "normal", label: "Normal" },
+const PIPELINES = [
+  { id: "procedural", label: "Procedural" },
+  { id: "ai", label: "AI" },
+];
+
+// Tabs depend on the active pipeline. "Light" is shared; the second tab is the
+// pipeline-specific map controls.
+const TABS = {
+  procedural: [
+    { id: "light", label: "Light" },
+    { id: "normal", label: "Normal" },
+  ],
+  ai: [
+    { id: "light", label: "Light" },
+    { id: "ai", label: "AI" },
+  ],
+};
+
+const OVERLAPS = [
+  { id: "SMALL", label: "Small" },
+  { id: "MEDIUM", label: "Medium" },
+  { id: "LARGE", label: "Large" },
 ];
 
 export function ControlsPanel({
+  pipeline,
+  onPipelineChange,
   tab,
   onTabChange,
   normalControls,
   onNormalControlsChange,
   lightControls,
   onLightControlsChange,
+  aiControls,
+  onAiControlsChange,
+  onGenerateAI,
+  aiBusy,
+  aiReady,
 }) {
+  const tabs = TABS[pipeline] || TABS.procedural;
+  const showNormal = pipeline === "procedural" && tab === "normal";
+  const showAi = pipeline === "ai" && tab === "ai";
+
   return (
     <aside class="controls" aria-label="Controls">
+      <div class="pipeline-switch segmented" role="group" aria-label="Generator">
+        {PIPELINES.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            class={pipeline === p.id ? "active" : ""}
+            aria-pressed={pipeline === p.id ? "true" : "false"}
+            data-pipeline={p.id}
+            onClick={() => onPipelineChange(p.id)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       <div class="control-tabs segmented" role="tablist" aria-label="Control panels">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -33,6 +78,7 @@ export function ControlsPanel({
         ))}
       </div>
 
+      {/* Light panel — shared by both pipelines (drives Lit / Split views). */}
       <div
         class={tab === "light" ? "control-panel active" : "control-panel"}
         id="lightPanel"
@@ -116,12 +162,13 @@ export function ControlsPanel({
         />
       </div>
 
+      {/* Normal panel — procedural pipeline only. */}
       <div
-        class={tab === "normal" ? "control-panel active" : "control-panel"}
+        class={showNormal ? "control-panel active" : "control-panel"}
         id="normalPanel"
         role="tabpanel"
         data-control-tab="normal"
-        hidden={tab !== "normal"}
+        hidden={!showNormal}
       >
         <div class="subsection-title">Enhance</div>
         <RangeRow
@@ -166,11 +213,7 @@ export function ControlsPanel({
           value={normalControls.biselBlur}
           onChange={(v) => onNormalControlsChange({ biselBlur: v })}
         />
-        <div
-          class="radio-group"
-          role="radiogroup"
-          aria-label="Bump profile"
-        >
+        <div class="radio-group" role="radiogroup" aria-label="Bump profile">
           <label>
             <input
               type="radio"
@@ -202,6 +245,62 @@ export function ControlsPanel({
             Use alpha
           </ToggleRow>
         </div>
+      </div>
+
+      {/* AI panel — AI pipeline only. */}
+      <div
+        class={showAi ? "control-panel active" : "control-panel"}
+        id="aiPanel"
+        role="tabpanel"
+        data-control-tab="ai"
+        hidden={!showAi}
+      >
+        <button
+          id="aiGenerateButton"
+          class="ai-generate"
+          type="button"
+          onClick={onGenerateAI}
+          disabled={aiBusy}
+        >
+          {aiBusy ? "Generating…" : aiReady ? "Regenerate AI Normal" : "Generate AI Normal"}
+        </button>
+        <p class="hint">
+          DeepBump runs in your browser. The first run downloads the model
+          (~27&nbsp;MB, cached afterward).
+        </p>
+
+        <div class="subsection-title">Denoise</div>
+        <RangeRow
+          label="Strength"
+          id="aiDenoise"
+          min={0}
+          max={3}
+          step={1}
+          value={aiControls.denoise}
+          onChange={(v) => onAiControlsChange({ denoise: v })}
+          format={(v) => (v > 0 ? `${v}px` : "Off")}
+        />
+        <p class="hint">
+          Edge-preserving smoothing of the input before inference. Raise this if a
+          JPEG source produces blocky artifacts in the normal map.
+        </p>
+
+        <div class="subsection-title">Overlap</div>
+        <div class="radio-group" role="radiogroup" aria-label="Tile overlap">
+          {OVERLAPS.map((o) => (
+            <label key={o.id}>
+              <input
+                type="radio"
+                name="aiOverlap"
+                value={o.id}
+                checked={aiControls.overlap === o.id}
+                onChange={() => onAiControlsChange({ overlap: o.id })}
+              />
+              {" "}{o.label}
+            </label>
+          ))}
+        </div>
+        <p class="hint">Higher overlap smooths tile seams (slower). Change, then Regenerate.</p>
       </div>
     </aside>
   );

@@ -49,6 +49,53 @@
     return g;
   }
 
+  // Edge-preserving denoise (bilateral filter) applied to the grayscale before
+  // inference. JPEG sources carry 8x8 DCT block edges + mosquito ringing that
+  // DeepBump would otherwise amplify into ugly bumpy normals; this smooths flat
+  // regions (spatial + range weighting) while preserving genuine edges. `radius`
+  // is in pixels; 0 disables. `sigmaR` is in [0,1] gray units — differences
+  // smaller than ~sigmaR are treated as noise and smoothed away.
+  function bilateral(gray, W, H, radius, sigmaS, sigmaR) {
+    if (!radius || radius < 1) return gray;
+    const out = new Float32Array(W * H);
+    const inv2s2 = 1 / (2 * sigmaS * sigmaS);
+    const inv2r2 = 1 / (2 * sigmaR * sigmaR);
+    const span = 2 * radius + 1;
+    const sw = new Float64Array(span * span); // precomputed spatial weights
+    let k = 0;
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        sw[k++] = Math.exp(-(dx * dx + dy * dy) * inv2s2);
+      }
+    }
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const c = gray[y * W + x];
+        let sum = 0;
+        let wsum = 0;
+        let i = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          let yy = y + dy;
+          if (yy < 0) yy = 0;
+          else if (yy >= H) yy = H - 1;
+          const row = yy * W;
+          for (let dx = -radius; dx <= radius; dx++) {
+            let xx = x + dx;
+            if (xx < 0) xx = 0;
+            else if (xx >= W) xx = W - 1;
+            const v = gray[row + xx];
+            const d = v - c;
+            const w = sw[i++] * Math.exp(-(d * d) * inv2r2);
+            sum += v * w;
+            wsum += w;
+          }
+        }
+        out[y * W + x] = sum / wsum;
+      }
+    }
+    return out;
+  }
+
   function computePadding(H, W, stride) {
     let padH = 0;
     let padW = 0;
@@ -179,7 +226,13 @@
     const threshold = opts.alphaThreshold ?? 0; // alpha <= threshold => background
     const { data, width: W, height: H } = image;
     const stride = TILE - (OVERLAPS[overlap] ?? OVERLAPS.LARGE);
-    const gray = toGray(data, W, H, maskAlpha ? threshold : -1);
+    const gray0 = toGray(data, W, H, maskAlpha ? threshold : -1);
+    // Optional edge-preserving denoise to suppress JPEG artifacts (off by
+    // default; the UI passes a small radius). sigmaR tuned for compression noise.
+    const denoiseRadius = Math.round(opts.denoise || 0);
+    const gray = denoiseRadius > 0
+      ? bilateral(gray0, W, H, denoiseRadius, denoiseRadius, 0.08)
+      : gray0;
 
     const { padLeft, padRight, padTop, padBottom } = computePadding(H, W, stride);
     const paddedH = H + padTop + padBottom;

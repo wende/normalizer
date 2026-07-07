@@ -5,8 +5,6 @@ const MODES = [
   { id: "split", label: "Split" },
   { id: "lit", label: "Lit" },
   { id: "normal", label: "Normal" },
-  { id: "ai", label: "AI Map" },
-  { id: "ailit", label: "AI Lit" },
   { id: "diffuse", label: "Diffuse" },
 ];
 

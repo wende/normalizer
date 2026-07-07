@@ -4,10 +4,10 @@ import { Toolbar } from "./Toolbar.jsx";
 import { PreviewArea } from "./PreviewArea.jsx";
 import { ControlsPanel } from "./ControlsPanel.jsx";
 import {
+  DEFAULT_AI_CONTROLS,
   DEFAULT_LIGHT_CONTROLS,
   DEFAULT_NORMAL,
   buildNormalParams,
-  loadAiSettings,
 } from "./controls.js";
 import {
   buildLightSettings,
@@ -21,28 +21,31 @@ import {
 
 const SAMPLE_SRC = "./sample.png";
 const LIGHT_SPRITE_SRC = "./laigter_texture.png";
-
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
 
 export function App() {
   const [source, setSource] = useState(null);
-  const [normal, setNormal] = useState(null);
+  const [proceduralNormal, setProceduralNormal] = useState(null);
   const [aiOverlay, setAiOverlay] = useState(null);
-  const [lit, setLit] = useState(null);
-  const [litToon, setLitToon] = useState(null);
-  const [mode, setMode] = useState("split");
-  const [tab, setTab] = useState("light");
-  const [status, setStatus] = useState("Ready");
   const [aiBusy, setAiBusy] = useState(false);
+  const [pipeline, setPipeline] = useState("procedural"); // "procedural" | "ai"
+  const [mode, setMode] = useState("split"); // preview view
+  const [tab, setTab] = useState("light"); // controls tab
+  const [status, setStatus] = useState("Ready");
   const [light, setLight] = useState({ x: 0, y: 0 });
   const [normalControls, setNormalControls] = useState(DEFAULT_NORMAL);
   const [lightControls, setLightControls] = useState(DEFAULT_LIGHT_CONTROLS);
+  const [aiControls, setAiControls] = useState(DEFAULT_AI_CONTROLS);
   const lastRect = useRef(null);
   const draggingLight = useRef(false);
   const lightSprite = useRef(null);
   const generateTimer = useRef(0);
-  const litTimer = useRef(0);
   const aiWorker = useRef(null);
+
+  // The active normal depends entirely on the pipeline — the procedural and AI
+  // maps are never mixed. Everything downstream (Lit/Split/Normal views, Export)
+  // reads this one value.
+  const activeNormal = pipeline === "ai" ? aiOverlay : proceduralNormal;
 
   // Load the light sprite once on mount so it's ready when drawPreview runs.
   useEffect(() => {
@@ -52,25 +55,29 @@ export function App() {
     lightSprite.current = img;
   }, []);
 
-  // Load AI settings from localStorage on mount. The values are referenced by
-  // future AI features, not the lit preview, so this just warms the storage.
-  useEffect(() => {
-    loadAiSettings();
-  }, []);
-
-  // Stable per-change handlers — debounce the heavier generate path, redraw
-  // the lit preview immediately on light-control changes.
   const onNormalControlsChange = useCallback((patch) => {
     setNormalControls((prev) => ({ ...prev, ...patch }));
   }, []);
-
   const onLightControlsChange = useCallback((patch) => {
     setLightControls((prev) => ({ ...prev, ...patch }));
   }, []);
+  const onAiControlsChange = useCallback((patch) => {
+    setAiControls((prev) => ({ ...prev, ...patch }));
+  }, []);
 
-  // DeepBump AI normal map — runs in a Web Worker so ONNX inference never
-  // blocks the UI thread. The result feeds the existing `aiOverlay` path:
-  // "AI Map" mode shows it raw, and the base normal blends it in at 0.65.
+  // Switch pipeline, keeping the controls tab valid for the new pipeline
+  // (Normal <-> AI are pipeline-specific; Light is shared).
+  const onPipelineChange = useCallback((next) => {
+    setPipeline(next);
+    setTab((prev) => {
+      if (next === "ai" && prev === "normal") return "ai";
+      if (next === "procedural" && prev === "ai") return "normal";
+      return prev;
+    });
+  }, []);
+
+  // DeepBump AI normal — runs in a Web Worker so ONNX inference never blocks the
+  // UI thread. The result is stored separately as `aiOverlay`.
   const ensureAiWorker = useCallback(() => {
     if (aiWorker.current) return aiWorker.current;
     const worker = new Worker("/deepbump.worker.js");
@@ -80,7 +87,6 @@ export function App() {
         setStatus(msg.phase === "model" ? "AI: loading model" : `AI: tile ${msg.done}/${msg.total}`);
       } else if (msg.type === "result") {
         setAiOverlay(new ImageData(new Uint8ClampedArray(msg.data), msg.width, msg.height));
-        setMode("ai");
         setAiBusy(false);
         setStatus(`AI map ready - ${msg.width}x${msg.height}`);
       } else if (msg.type === "error") {
@@ -101,15 +107,21 @@ export function App() {
       setStatus("Load an image first.");
       return;
     }
+    setPipeline("ai");
     setAiBusy(true);
     setStatus("AI: starting");
     const worker = ensureAiWorker();
     const copy = source.data.slice(); // detached copy so `source` stays intact
     worker.postMessage(
-      { type: "generate", image: { data: copy.buffer, width: source.width, height: source.height }, overlap: "LARGE" },
+      {
+        type: "generate",
+        image: { data: copy.buffer, width: source.width, height: source.height },
+        overlap: aiControls.overlap,
+        denoise: aiControls.denoise,
+      },
       [copy.buffer]
     );
-  }, [source, ensureAiWorker]);
+  }, [source, aiControls, ensureAiWorker]);
 
   // Terminate the worker on unmount.
   useEffect(() => () => {
@@ -119,77 +131,51 @@ export function App() {
     }
   }, []);
 
-  // Re-run normal generation when the source or normal-map controls change.
-  // Debounced at 40ms to coalesce slider drags.
+  // Procedural normal — recomputed (debounced) from the source + normal sliders.
+  // Pure analytic; the AI map is kept entirely separate.
   useEffect(() => {
     if (!source) return;
     clearTimeout(generateTimer.current);
     generateTimer.current = setTimeout(() => {
       const start = performance.now();
       const params = buildNormalParams(normalControls);
-      const next = generateNormal(source, params, aiOverlay, 0.65);
-      setNormal(next);
-      setLit(null);
-      setLitToon(null);
+      setProceduralNormal(generateNormal(source, params));
       setStatus(`${source.width}x${source.height} - ${Math.round(performance.now() - start)} ms`);
     }, 40);
     return () => clearTimeout(generateTimer.current);
-  }, [source, normalControls, aiOverlay]);
+  }, [source, normalControls]);
 
-  // Light-control changes invalidate the cached lit preview; debounce slightly
-  // to coalesce slider drags but redraw promptly on color picker changes.
-  useEffect(() => {
-    setLit(null);
-    setLitToon(null);
-  }, [lightControls]);
-
-  // Compute lit preview lazily — built fresh when source/normal/light change.
+  // Lit preview for whichever normal is active — rebuilt on source/normal/light.
   const litCache = useMemo(() => {
-    if (!source || !normal) return null;
+    if (!source || !activeNormal) return null;
     const settings = buildLightSettings(light, lightControls);
-    return lightControls.toon ? renderLit(source, normal, settings, true) : renderLit(source, normal, settings, false);
-  }, [source, normal, light, lightControls]);
-
-  // Lit preview driven by the raw AI (DeepBump) normal instead of the blended
-  // one — lets you test the AI map under a draggable light. Only computed while
-  // the "AI Lit" mode is active so it doesn't tax other views.
-  const aiLitCache = useMemo(() => {
-    if (!source || !aiOverlay || mode !== "ailit") return null;
-    const settings = buildLightSettings(light, lightControls);
-    return renderLit(source, aiOverlay, settings, lightControls.toon);
-  }, [source, aiOverlay, mode, light, lightControls]);
+    return renderLit(source, activeNormal, settings, lightControls.toon);
+  }, [source, activeNormal, light, lightControls]);
 
   const drawArgs = useMemo(() => ({
     source,
-    normal,
-    litCache: lightControls.toon ? litToon || litCache : litCache,
-    litToonCache: lightControls.toon ? litCache : null,
-    aiOverlay,
-    aiLitCache,
+    normal: activeNormal,
+    litCache,
     mode,
+    pipeline,
     light,
     pixelated: lightControls.pixelated,
     draggingLight: draggingLight.current,
     lightSprite: lightSprite.current,
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
-  }), [source, normal, litCache, litToon, aiOverlay, aiLitCache, mode, light, lightControls]);
+  }), [source, activeNormal, litCache, mode, pipeline, light, lightControls]);
 
   const onLightMove = useCallback((canvasPoint) => {
     if (!source || !lastRect.current) return;
     const next = canvasToLight(canvasPoint, source, lastRect.current);
-    setLight((prev) => {
-      if (prev.x === next.x && prev.y === next.y) return prev;
-      return next;
-    });
+    setLight((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
   }, [source]);
 
   const loadFromImage = useCallback(async (image) => {
     const data = readSourceFromImage(image);
     setSource(data);
-    setAiOverlay(null);
-    setLit(null);
-    setLitToon(null);
+    setAiOverlay(null); // AI map is per-image; force a regenerate for the new one
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
   }, []);
 
@@ -230,9 +216,7 @@ export function App() {
       <Toolbar
         onOpenFile={onOpenFile}
         onLoadSample={loadSample}
-        onExport={() => exportNormalPng(normal)}
-        onGenerateAI={onGenerateAI}
-        aiBusy={aiBusy}
+        onExport={() => exportNormalPng(activeNormal)}
       />
       <section class="workspace">
         <PreviewArea
@@ -245,12 +229,19 @@ export function App() {
           lastRectRef={lastRect}
         />
         <ControlsPanel
+          pipeline={pipeline}
+          onPipelineChange={onPipelineChange}
           tab={tab}
           onTabChange={setTab}
           normalControls={normalControls}
           onNormalControlsChange={onNormalControlsChange}
           lightControls={lightControls}
           onLightControlsChange={onLightControlsChange}
+          aiControls={aiControls}
+          onAiControlsChange={onAiControlsChange}
+          onGenerateAI={onGenerateAI}
+          aiBusy={aiBusy}
+          aiReady={!!aiOverlay}
         />
       </section>
     </main>

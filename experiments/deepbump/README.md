@@ -52,11 +52,22 @@ included as a quick sanity check.
 
 ## Browser integration (Web Worker) — wired into the app
 
-The same algorithm now runs client-side, off the main thread, behind the
-**"AI Normal"** button in the toolbar (previously the unstyled/hidden
-`#aiGenerateButton`). Clicking it generates a DeepBump normal map from the
-current source image and feeds the existing `aiOverlay` path: **AI Map** mode
-shows it raw, and the base normal blends it in at 0.65.
+The same algorithm runs client-side, off the main thread. The UI has a
+top-level **Procedural / AI** pipeline switch (top of the controls panel): the
+two generators are never mixed — the active one drives every view and the
+export. There is no blend.
+
+- **Procedural** pipeline → the analytic emboss/bevel normal, with the **Normal**
+  controls tab.
+- **AI** pipeline → the DeepBump normal, with an **AI** controls tab holding the
+  Generate/Regenerate button (previously the hidden `#aiGenerateButton`), a
+  **Denoise** slider, and the Overlap knob. Until you generate, AI views show a
+  "No AI map generated yet" hint instead of a misleading procedural fallback.
+
+The preview views are the same in both pipelines — **Split / Lit / Normal /
+Diffuse** — they just reflect whichever normal is active. So **Lit** is your
+test view: switch to AI, Generate, and drag the light to watch the DeepBump
+geometry catch highlights.
 
 Files:
 
@@ -69,17 +80,8 @@ Files:
   runs inference. Classic (not a module) worker on purpose: no bundler config,
   no new npm deps, and it works whether the app is served by Vite or by
   `web/server.js`.
-- UI hooks live in `web/src/Toolbar.jsx` (the button) and `web/src/App.jsx`
-  (worker lifecycle → `setAiOverlay`).
-
-Preview modes for the AI map (segmented control, top of the preview):
-
-- **AI Map** — the raw DeepBump normal (RGB visualization).
-- **AI Lit** — the lit preview driven by the *pure* AI normal under a draggable
-  light. This is the real test of the map: drag the light handle and watch the
-  DeepBump geometry catch highlights. (The plain **Lit** mode uses the blended
-  normal instead.) `aiLitCache` in `App.jsx` only renders while this mode is
-  active, so it costs nothing in other views.
+- UI: `web/src/ControlsPanel.jsx` (pipeline switch + AI tab), `web/src/App.jsx`
+  (pipeline state, `activeNormal`, worker lifecycle → `setAiOverlay`).
 
 Design choices:
 
@@ -91,6 +93,15 @@ Design choices:
   (CORS-open), cached after first download. To serve it locally, drop
   `deepbump256.onnx` into `web/`, set `DEFAULT_MODEL_URL = "/deepbump256.onnx"`
   in the worker, and add `.onnx -> application/octet-stream` to `server.js`.
+- **JPEG artifacts**: DeepBump reads luminance and amplifies gradients, so a
+  JPEG source's 8x8 block edges and mosquito ringing become bumpy normals. Our
+  own pipeline is lossless (canvas RGBA in, PNG out) — the artifacts ride in on
+  the input. `colorToNormals` takes an `options.denoise` radius (the **Denoise**
+  slider) that runs an edge-preserving bilateral filter on the grayscale *before*
+  inference: it smooths flat/ringing regions while keeping real edges. Default 1;
+  raise to 2-3 for heavily compressed sources. `sigmaR` is tuned (0.08) for
+  compression-noise amplitude. Core default is 0 (off) so it never surprises the
+  parity test; the UI supplies its own value.
 - **Alpha handling**: DeepBump itself only reads RGB, so `colorToNormals` adds
   it back (on by default; `options.maskAlpha`). Transparent source pixels are
   written as a flat, opaque normal (128,128,255) to match the base map, and

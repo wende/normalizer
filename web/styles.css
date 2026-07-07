@@ -133,7 +133,7 @@ button:hover,
 
 .segmented {
   display: inline-grid;
-  grid-template-columns: repeat(6, minmax(54px, 1fr));
+  grid-template-columns: repeat(4, minmax(64px, 1fr));
   border: 1px solid var(--line);
   border-radius: 6px;
   overflow: hidden;
@@ -176,11 +176,41 @@ button:hover,
   background: var(--surface);
 }
 
+.pipeline-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.pipeline-switch button {
+  font-weight: 600;
+  min-height: 38px;
+}
+
 .control-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
   margin-bottom: 18px;
+}
+
+.ai-generate {
+  width: 100%;
+  min-height: 38px;
+  margin-bottom: 10px;
+}
+
+.ai-generate:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.control-panel .hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 8px 0 14px;
 }
 
 .control-panel {
