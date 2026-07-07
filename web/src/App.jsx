@@ -13,11 +13,12 @@ import {
   buildLightSettings,
   drawPreview,
   exportNormalPng,
-  generateNormal,
+  blendNormalOverlay,
   readSourceFromImage,
   renderLit,
   canvasToLight,
 } from "./previewRender.js";
+import { useNormalWorker } from "./useNormalWorker.js";
 
 const SAMPLE_SRC = "./sample.png";
 const LIGHT_SPRITE_SRC = "./laigter_texture.png";
@@ -67,18 +68,27 @@ export function App() {
   }, []);
 
   // Re-run normal generation when the source or normal-map controls change.
-  // Debounced at 40ms to coalesce slider drags.
+  // Debounced at 40ms to coalesce slider drags. The expensive EDT + blurs
+  // run inside a Web Worker (web/src/normal.worker.js); the AI overlay
+  // blend stays on main because it constructs ImageData.
+  const { request } = useNormalWorker();
   useEffect(() => {
     if (!source) return;
     clearTimeout(generateTimer.current);
     generateTimer.current = setTimeout(() => {
-      const start = performance.now();
       const params = buildNormalParams(normalControls);
-      const next = generateNormal(source, params, aiOverlay, 0.65);
-      setNormal(next);
-      setLit(null);
-      setLitToon(null);
-      setStatus(`${source.width}x${source.height} - ${Math.round(performance.now() - start)} ms`);
+      request(source, params).then((res) => {
+        if (!res.ok) {
+          setStatus(`${source.width}x${source.height} - error`);
+          return;
+        }
+        const base = new ImageData(res.data, res.width, res.height);
+        const next = blendNormalOverlay(base, source, aiOverlay, 0.65);
+        setNormal(next);
+        setLit(null);
+        setLitToon(null);
+        setStatus(`${source.width}x${source.height} - ${Math.round(res.ms)} ms`);
+      });
     }, 40);
     return () => clearTimeout(generateTimer.current);
   }, [source, normalControls, aiOverlay]);
