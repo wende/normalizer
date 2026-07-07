@@ -139,7 +139,7 @@ function drawImageData(ctx, imageData, rect, pixelated) {
   ctx.drawImage(offscreen, rect.x, rect.y, rect.width, rect.height);
 }
 
-function drawLightHandle(ctx, light, source, rect, dragging, lightSprite) {
+export function drawLightHandle(ctx, light, source, rect, dragging, lightSprite) {
   const ratio = window.devicePixelRatio || 1;
   const pos = lightToCanvas(light, source, rect);
   const size = lightHandleSize(ratio);
@@ -162,7 +162,7 @@ function drawLightHandle(ctx, light, source, rect, dragging, lightSprite) {
 }
 
 // Empty-state message shown in the AI pipeline before DeepBump has been run.
-function drawAiPlaceholder(ctx, canvas) {
+export function drawAiPlaceholder(ctx, canvas) {
   const ratio = window.devicePixelRatio || 1;
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;

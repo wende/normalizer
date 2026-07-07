@@ -59,10 +59,15 @@ export. There is no blend.
 
 - **Procedural** pipeline → the analytic emboss/bevel normal, with the **Normal**
   controls tab.
-- **AI** pipeline → the DeepBump normal, with an **AI** controls tab holding the
-  Generate/Regenerate button (previously the hidden `#aiGenerateButton`), a
-  **Denoise** slider, and the Overlap knob. Until you generate, AI views show a
-  "No AI map generated yet" hint instead of a misleading procedural fallback.
+- **AI** pipeline → the DeepBump normal, with an **AI** controls tab. It has two
+  groups: **Adjust** (live post-process — Strength/depth, Smooth, **Steps**
+  (normal quantization into flat facets for a pixel-art look), Invert X/Y/Z —
+  applied instantly, no re-inference) and **Generation** (Denoise + Overlap,
+  which change the model input and need a Regenerate). The raw DeepBump output is
+  kept pristine (`aiOverlay`); `web/src/normalAdjust.js` derives the shown/exported
+  map from it, so tweaks are non-destructive and reversible. Until you generate,
+  AI views show a "No AI map generated yet" hint instead of a misleading
+  procedural fallback.
 
 The preview views are the same in both pipelines — **Split / Lit / Normal /
 Diffuse** — they just reflect whichever normal is active. So **Lit** is your

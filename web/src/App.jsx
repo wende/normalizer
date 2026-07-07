@@ -15,9 +15,9 @@ import {
   exportNormalPng,
   generateNormal,
   readSourceFromImage,
-  renderLit,
   canvasToLight,
 } from "./previewRender.js";
+import { adjustNormalMap } from "./normalAdjust.js";
 
 const SAMPLE_SRC = "./sample.png";
 const LIGHT_SPRITE_SRC = "./laigter_texture.png";
@@ -42,10 +42,25 @@ export function App() {
   const generateTimer = useRef(0);
   const aiWorker = useRef(null);
 
+  // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
+  // tweaks (strength/smooth/invert) are applied on top to produce the AI normal.
+  // No re-inference — this recomputes instantly as the Adjust sliders move.
+  const aiNormal = useMemo(() => {
+    if (!aiOverlay) return null;
+    return adjustNormalMap(aiOverlay, {
+      strength: aiControls.strength / 100,
+      smooth: aiControls.smooth,
+      steps: aiControls.steps,
+      invertX: aiControls.invertX,
+      invertY: aiControls.invertY,
+      invertZ: aiControls.invertZ,
+    });
+  }, [aiOverlay, aiControls.strength, aiControls.smooth, aiControls.steps, aiControls.invertX, aiControls.invertY, aiControls.invertZ]);
+
   // The active normal depends entirely on the pipeline — the procedural and AI
   // maps are never mixed. Everything downstream (Lit/Split/Normal views, Export)
   // reads this one value.
-  const activeNormal = pipeline === "ai" ? aiOverlay : proceduralNormal;
+  const activeNormal = pipeline === "ai" ? aiNormal : proceduralNormal;
 
   // Load the light sprite once on mount so it's ready when drawPreview runs.
   useEffect(() => {
@@ -145,26 +160,22 @@ export function App() {
     return () => clearTimeout(generateTimer.current);
   }, [source, normalControls]);
 
-  // Lit preview for whichever normal is active — rebuilt on source/normal/light.
-  const litCache = useMemo(() => {
-    if (!source || !activeNormal) return null;
-    const settings = buildLightSettings(light, lightControls);
-    return renderLit(source, activeNormal, settings, lightControls.toon);
-  }, [source, activeNormal, light, lightControls]);
-
+  // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
+  // only update a shader uniform, so no ImageData is rebuilt per drag here.
   const drawArgs = useMemo(() => ({
     source,
     normal: activeNormal,
-    litCache,
     mode,
     pipeline,
     light,
+    lightSettings: buildLightSettings(light, lightControls),
+    toon: lightControls.toon,
     pixelated: lightControls.pixelated,
     draggingLight: draggingLight.current,
     lightSprite: lightSprite.current,
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
-  }), [source, activeNormal, litCache, mode, pipeline, light, lightControls]);
+  }), [source, activeNormal, mode, pipeline, light, lightControls]);
 
   const onLightMove = useCallback((canvasPoint) => {
     if (!source || !lastRect.current) return;

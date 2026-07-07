@@ -269,9 +269,70 @@ export function ControlsPanel({
           (~27&nbsp;MB, cached afterward).
         </p>
 
-        <div class="subsection-title">Denoise</div>
+        <div class="subsection-title">Adjust</div>
+        <p class="hint">Applied live to the generated map — no regenerate needed.</p>
         <RangeRow
           label="Strength"
+          id="aiStrength"
+          min={0}
+          max={300}
+          step={5}
+          value={aiControls.strength}
+          onChange={(v) => onAiControlsChange({ strength: v })}
+          format={(v) => `${v}%`}
+        />
+        <RangeRow
+          label="Smooth"
+          id="aiSmooth"
+          min={0}
+          max={5}
+          step={1}
+          value={aiControls.smooth}
+          onChange={(v) => onAiControlsChange({ smooth: v })}
+          format={(v) => (v > 0 ? `${v}px` : "Off")}
+        />
+        <RangeRow
+          label="Steps"
+          id="aiSteps"
+          min={0}
+          max={5}
+          step={1}
+          value={aiControls.steps}
+          onChange={(v) => onAiControlsChange({ steps: v })}
+          format={(v) => (v > 0 ? `${2 * v + 1} lv` : "Off")}
+        />
+        <p class="hint">
+          Steps quantizes the normal into flat facets for a pixel-art look
+          (pairs well with higher Strength). Off = smooth gradient.
+        </p>
+        <div class="toggles">
+          <ToggleRow
+            id="aiInvertX"
+            checked={aiControls.invertX}
+            onChange={(v) => onAiControlsChange({ invertX: v })}
+          >
+            Invert X
+          </ToggleRow>
+          <ToggleRow
+            id="aiInvertY"
+            checked={aiControls.invertY}
+            onChange={(v) => onAiControlsChange({ invertY: v })}
+          >
+            Invert Y (DirectX)
+          </ToggleRow>
+          <ToggleRow
+            id="aiInvertZ"
+            checked={aiControls.invertZ}
+            onChange={(v) => onAiControlsChange({ invertZ: v })}
+          >
+            Invert Z
+          </ToggleRow>
+        </div>
+
+        <div class="subsection-title">Generation</div>
+        <p class="hint">These change the model input — Regenerate to apply.</p>
+        <RangeRow
+          label="Denoise"
           id="aiDenoise"
           min={0}
           max={3}
@@ -280,12 +341,6 @@ export function ControlsPanel({
           onChange={(v) => onAiControlsChange({ denoise: v })}
           format={(v) => (v > 0 ? `${v}px` : "Off")}
         />
-        <p class="hint">
-          Edge-preserving smoothing of the input before inference. Raise this if a
-          JPEG source produces blocky artifacts in the normal map.
-        </p>
-
-        <div class="subsection-title">Overlap</div>
         <div class="radio-group" role="radiogroup" aria-label="Tile overlap">
           {OVERLAPS.map((o) => (
             <label key={o.id}>
@@ -300,7 +355,7 @@ export function ControlsPanel({
             </label>
           ))}
         </div>
-        <p class="hint">Higher overlap smooths tile seams (slower). Change, then Regenerate.</p>
+        <p class="hint">Overlap: higher smooths tile seams (slower).</p>
       </div>
     </aside>
   );

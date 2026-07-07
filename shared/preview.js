@@ -5,6 +5,10 @@
  * Pure function over plain { width, height, data } records — no DOM, no Node
  * APIs. Mirrors shared/normal.js: callers wrap the returned record as ImageData
  * (browser) or write it via pngjs (CLI/tests).
+ *
+ * The browser viewport renders this same math on the GPU via web/src/litGL.js
+ * (so light dragging is resolution-independent). This function remains the
+ * validated CPU parity reference and the no-WebGL fallback.
  */
 
 import { rgbaOffset } from "./image.js";

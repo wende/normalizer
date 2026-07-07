@@ -43,8 +43,16 @@ export const DEFAULT_AI = {
 // Controls for the in-browser DeepBump pipeline (AI tab). `overlap` is the one
 // native DeepBump knob — tile stride / seam blending, not strength.
 export const DEFAULT_AI_CONTROLS = {
+  // Generation params (require Regenerate):
   overlap: "LARGE", // "SMALL" | "MEDIUM" | "LARGE"
   denoise: 1, // edge-preserving pre-filter radius (px); 0 = off. Tames JPEG artifacts.
+  // Live post-process (applied instantly to the generated map):
+  strength: 100, // % ; 100 = as generated, higher = deeper relief, 0 = flat
+  smooth: 0, // post blur radius (px); 0 = off
+  steps: 0, // normal-direction quantization for pixel-art facets; 0 = off
+  invertX: false,
+  invertY: false,
+  invertZ: false,
 };
 
 export const AI_STORAGE_KEY = "normalizer.ai";
