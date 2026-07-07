@@ -123,8 +123,9 @@ export function ControlsPanel({
         data-control-tab="normal"
         hidden={tab !== "normal"}
       >
+        <div class="subsection-title">Enhance</div>
         <RangeRow
-          label="Depth"
+          label="Height"
           id="normalDepth"
           min={0}
           max={4000}
@@ -132,15 +133,17 @@ export function ControlsPanel({
           onChange={(v) => onNormalControlsChange({ normalDepth: v })}
         />
         <RangeRow
-          label="Blur"
+          label="Soft"
           id="normalBlur"
           min={0}
           max={40}
           value={normalControls.normalBlur}
           onChange={(v) => onNormalControlsChange({ normalBlur: v })}
         />
+
+        <div class="subsection-title">Bump</div>
         <RangeRow
-          label="Bevel Depth"
+          label="Height"
           id="biselDepth"
           min={0}
           max={4000}
@@ -148,7 +151,7 @@ export function ControlsPanel({
           onChange={(v) => onNormalControlsChange({ biselDepth: v })}
         />
         <RangeRow
-          label="Bevel Width"
+          label="Distance"
           id="biselDistance"
           min={0}
           max={255}
@@ -156,21 +159,41 @@ export function ControlsPanel({
           onChange={(v) => onNormalControlsChange({ biselDistance: v })}
         />
         <RangeRow
-          label="Bevel Blur"
+          label="Soft"
           id="biselBlur"
           min={0}
           max={40}
           value={normalControls.biselBlur}
           onChange={(v) => onNormalControlsChange({ biselBlur: v })}
         />
+        <div
+          class="radio-group"
+          role="radiogroup"
+          aria-label="Bump profile"
+        >
+          <label>
+            <input
+              type="radio"
+              name="biselProfile"
+              value="soft"
+              checked={normalControls.softBisel === true}
+              onChange={() => onNormalControlsChange({ softBisel: true })}
+            />
+            {" "}Soft
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="biselProfile"
+              value="abrupt"
+              checked={normalControls.softBisel === false}
+              onChange={() => onNormalControlsChange({ softBisel: false })}
+            />
+            {" "}Abrupt
+          </label>
+        </div>
+
         <div class="toggles">
-          <ToggleRow
-            id="softBisel"
-            checked={normalControls.softBisel}
-            onChange={(v) => onNormalControlsChange({ softBisel: v })}
-          >
-            Soft bevel
-          </ToggleRow>
           <ToggleRow
             id="useAlpha"
             checked={normalControls.useAlpha}

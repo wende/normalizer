@@ -133,7 +133,7 @@ button:hover,
 
 .segmented {
   display: inline-grid;
-  grid-template-columns: repeat(5, minmax(58px, 1fr));
+  grid-template-columns: repeat(6, minmax(54px, 1fr));
   border: 1px solid var(--line);
   border-radius: 6px;
   overflow: hidden;
@@ -241,6 +241,25 @@ button:hover,
 
 .range-row input {
   width: 100%;
+  accent-color: var(--accent);
+}
+
+.radio-group {
+  display: flex;
+  gap: 14px;
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.radio-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.radio-group input {
   accent-color: var(--accent);
 }
 

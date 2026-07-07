@@ -39,68 +39,66 @@ Consequences:
 
 Ordered. Parameter names, ranges, and defaults for each map come from the
 inventory in REWRITE_PLAN.md §2.
+Status verified 2026-07-07 against git history and tree.
 
-1. **Shared algorithm module + Node CLI skeleton** — move generation code
-   out of `web/app.js` into a module imported by both the browser app and a
-   Node CLI. Prerequisite for everything below.
-2. **Parallax map generation + panel** — Binary and HeightMap types only
-   (Quantization/Intervals are unimplemented stubs upstream, see
-   REWRITE_PLAN.md §2 and "Deliberately deferred"). Params: REWRITE_PLAN.md
-   §2 "Parallax map" table.
-3. **Specular map generation + panel** — params: §2 "Specular map" table.
-4. **Occlusion map generation + panel** — params: §2 "Occlusion map" table,
-   including distance mode (reuses the alpha distance transform from the
-   normal bevel path).
-5. **Export with suffix convention** — `_n/_p/_s/_o` per REWRITE_PLAN.md §2
-   "Export / batch".
-6. **Tileable 3×3 neighbour mosaics** — compute on mosaic, crop center, per
-   REWRITE_PLAN.md §1 "Tileability". Do this before sprite sheets: the
-   per-frame mosaic machinery builds on it, so the pipeline refactor happens
-   once. Neighbour-image inputs (§2 "Inputs") can wait; plain tileX/tileY
-   self-tiling first.
-7. **Sprite-sheet splitting + animation playback** — `h_frames`/`v_frames`
-   split, named frame lists, fps playback (REWRITE_PLAN.md §2 "Inputs",
-   §3 Phase 3.7).
-8. **Node CLI batch export** — folder scan, per-map suffixes, output dir,
-   recursive, `--check-changes` mtime skip (REWRITE_PLAN.md §2
-   "Export / batch"). Mirrors upstream's headless CLI (§1).
+1. ✅ ~~**Shared algorithm module + Node CLI skeleton**~~ — DONE
+   (`6e2414a`, `b5b9dee`). `shared/` holds `image.js`, `normal.js`,
+   `primitives.js`, `preview.js`; `cli/normalizer.js` is the Node CLI.
+2. ❌ **Parallax map generation + panel** — NOT STARTED. No parallax code in
+   `shared/` or `cli/`; only `normal` map exists.
+3. ❌ **Specular map generation + panel** — NOT STARTED. `specular*` refs in
+   `web/src/` are preview-lighting params, not map generation.
+4. ❌ **Occlusion map generation + panel** — NOT STARTED.
+5. ❌ **Export with suffix convention** — NOT STARTED. CLI takes a single
+   explicit output path; no `_n/_p/_s/_o` logic anywhere.
+6. ❌ **Tileable 3×3 neighbour mosaics** — NOT STARTED. No tileX/tileY,
+   mosaic, or center-crop code. (Original intent: compute on mosaic, crop
+   center, per REWRITE_PLAN.md §1 "Tileability"; plain self-tiling first,
+   neighbour-image inputs can wait.)
+7. ❌ **Sprite-sheet splitting + animation playback** — NOT STARTED. No
+   `h_frames`/`v_frames`/frame-list/fps code (the only "sprite"/"frame" hits
+   in `web/` are the preview light sprite and a code comment).
+8. ❌ **Node CLI batch export** — NOT STARTED. `cli/normalizer.js` is
+   single-input/single-output, `normal` subcommand only; no folder scan,
+   suffixes, recursion, or `--check-changes`.
 
 ## 2. Implement cheaply alongside (hygiene, not features)
 
-- **Single Web Worker recompute** — one worker + the existing debounce, not
-  the per-map worker pool from REWRITE_PLAN.md §3 Phase 3.3. Occlusion's
-  distance transform and large blurs will jank the main thread otherwise.
-  Add the pool only if it ever hurts.
-- **Self-regression goldens** — repurpose the existing harness
-  (`tests/golden/`, `scripts/generate_goldens.py`, `scripts/diff_pngs.py`):
-  pin our *own* CLI output as expected PNGs instead of upstream's.
-  "Free to diverge" kills upstream parity, not refactor safety. Extend
-  `tests/golden/manifest.json` as each map/feature lands, as its README
-  already instructs.
+- ❌ **Single Web Worker recompute** — NOT STARTED. No `Worker`/`postMessage`
+  in `web/`; recompute is still on the main thread. (One worker + the
+  existing debounce, not the per-map worker pool from REWRITE_PLAN.md §3
+  Phase 3.3. Occlusion's distance transform and large blurs will jank the
+  main thread otherwise. Add the pool only if it ever hurts.)
+- ❌ **Self-regression goldens** — NOT STARTED; harness is still upstream-parity.
+  `tests/golden/manifest.json` describes itself as "validating the Laigter
+  rewrite against upstream Laigter"; `tests/golden/README.md` says `make
+  golden` "compares … against `tests/golden/upstream/`"; `upstream/` PNGs are
+  still checked in. Pin our own CLI output as expected PNGs instead.
 
 ## 3. Defer (real value, wrong time — with re-entry triggers)
 
-| Item | Plan ref | Trigger to revisit |
-|---|---|---|
-| React + TS + Vite shell | §3 Phase 3.1 | Vanilla UI state handling starts fighting us (~4 more panels will roughly triple `app.js`). Cheap middle step available now: convert the shared module to TypeScript. |
-| WebGL2 port of `fshader.glsl` + full lights/ambient/specular/parallax preview | §3 Phase 3.2, §2 "Preview-only" | When parallax generation lands — a parallax map you can't preview is hard to tune. |
-| Custom heightmap / specular base inputs (UI) | §2 "Inputs" | User demand. Generation code keeps accepting an optional height/specular source so only UI is missing. |
-| Paint overlays in UI | §3 "Deliberately deferred" | Same: core keeps accepting overlay buffers (already the upstream plan's stance). |
-| Tauri desktop packaging | §3 Phase 3.1 | Only if folder-watch or distribution to non-terminal users becomes a goal; Node CLI covers batch until then. |
-| Performance budget validation | §3 Phase 4.3 | Don't formalize; log recompute time in dev, look at it as each map lands. |
-| New project zip format | §3 Phase 3.6 | Project firms up into a product. Until then: JSON settings export alongside PNGs. |
+| Item | Plan ref | Trigger to revisit | Status (2026-07-07) |
+|---|---|---|---|
+| React + TS + Vite shell | §3 Phase 3.1 | Vanilla UI state handling starts fighting us (~4 more panels will roughly triple `app.js`). Cheap middle step available now: convert the shared module to TypeScript. | 🟡 Partial — Preact + Vite + JSX shell landed (`cd8084d` "Rewrite web UI in Preact"; `web/src/*.jsx`). Not React, not TS. |
+| WebGL2 port of `fshader.glsl` + full lights/ambient/specular/parallax preview | §3 Phase 3.2, §2 "Preview-only" | When parallax generation lands — a parallax map you can't preview is hard to tune. | 🟡 Partial — Canvas2D lit preview with specular/scatter light controls shipped (`b5b9dee`, `0a94e62`, `d4e9030`; `shared/preview.js`, `web/src/previewRender.js`). Not WebGL2; no ambient/parallax preview. |
+| Custom heightmap / specular base inputs (UI) | §2 "Inputs" | User demand. Generation code keeps accepting an optional height/specular source so only UI is missing. | ❌ Still deferred (no UI; `generateNormalMap` takes no height/spec source yet). |
+| Paint overlays in UI | §3 "Deliberately deferred" | Same: core keeps accepting overlay buffers (already the upstream plan's stance). | ❌ Still deferred. |
+| Tauri desktop packaging | §3 Phase 3.1 | Only if folder-watch or distribution to non-terminal users becomes a goal; Node CLI covers batch until then. | ❌ Still deferred. |
+| Performance budget validation | §3 Phase 4.3 | Don't formalize; log recompute time in dev, look at it as each map lands. | ❌ Still deferred (no recompute-time logging in `web/`). |
+| New project zip format | §3 Phase 3.6 | Project firms up into a product. Until then: JSON settings export alongside PNGs. | ❌ Still deferred. |
 
 ## 4. Drop (invalidated by the decisions above)
 
-- **Upstream golden corpus / pixel-diff parity** (REWRITE_PLAN.md Phase 0,
-  Phase 4.1) — non-goal under "free to diverge". The harness survives only
-  in its self-regression role (§2 above).
-- **WASM build, TS wrapper, Node WASM smoke test, WASM/core CI parity**
-  (Phase 2, Phase 4.1) — mooted by the single-JS-implementation decision.
-- **Legacy preset import** and **`.laigter` project import** (Phase 3.5–3.6)
-  — only matter for migrating other people's Laigter projects. Formats are
-  simple (plain-text presets per §1; zip projects); late implementation
-  costs the same as early. Revisit only if this becomes a public successor.
+- 🟡 **Upstream golden corpus / pixel-diff parity** — DECLARED but NOT
+  EXECUTED. `tests/golden/upstream/` is still checked in and is still the
+  diff target per `tests/golden/README.md` and the manifest description; the
+  "free to diverge" non-goal has not been acted on. The harness is meant to
+  survive only in its self-regression role (§2 above), which itself is
+  unstarted.
+- ✅ ~~**WASM build, TS wrapper, Node WASM smoke test, WASM/core CI parity**~~
+  — DROPPED. No Emscripten/WASM/`.ts` anywhere in the tree; decision held.
+- ✅ ~~**Legacy preset import** and **`.laigter` project import**~~ — DROPPED.
+  Neither present. (Revisit only if this becomes a public successor.)
 
 ## Known loss / escape hatch
 
@@ -110,3 +108,15 @@ tooling as sunk cost. Accepted. **Before deleting `core/` or
 upstream build still works, or keep the upstream PNGs checked in — rebuilding
 upstream Laigter with Qt later is the expensive part if bit-exactness is
 ever wanted again (REWRITE_PLAN.md Phase 0).
+
+Status (2026-07-07): neither deletion has happened — `core/` (with
+`include/`, `src/`, `tools/`) and `tests/golden/upstream/` are both still
+present. Consistent with the escape hatch: still reclaimable.
+
+## Not in this plan, but shipped
+
+- **AI Map / normalcy integration** — `web/server.js` proxies to vendored
+  `third_party/normalcy` (`/api/normalcy/doctor`, `/api/normalcy/generate`),
+  with an AI overlay + preview mode in the UI (`c19e327`, `56eabfc`).
+  Predates this plan (2026-07-06) and is not referenced above; tracked here
+  so it isn't lost on the next review.

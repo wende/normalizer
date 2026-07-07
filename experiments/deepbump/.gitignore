@@ -1,0 +1,3 @@
+# model weights (~27MB) — download via README, don't commit
+*.onnx
+.venv/

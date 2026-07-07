@@ -1,6 +1,6 @@
 import { useRef } from "preact/hooks";
 
-export function Toolbar({ onOpenFile, onLoadSample, onExport }) {
+export function Toolbar({ onOpenFile, onLoadSample, onExport, onGenerateAI, aiBusy }) {
   const fileRef = useRef(null);
   return (
     <header class="toolbar">
@@ -21,6 +21,15 @@ export function Toolbar({ onOpenFile, onLoadSample, onExport }) {
           onChange={(e) => onOpenFile(e.currentTarget.files?.[0])}
         />
         <button id="sampleButton" type="button" onClick={onLoadSample}>Sample</button>
+        <button
+          id="aiGenerateButton"
+          type="button"
+          onClick={onGenerateAI}
+          disabled={aiBusy}
+          title="Generate an AI normal map (DeepBump) in a background worker"
+        >
+          {aiBusy ? "Generating…" : "AI Normal"}
+        </button>
         <button id="exportButton" type="button" onClick={onExport}>Export PNG</button>
       </div>
     </header>
