@@ -17,7 +17,8 @@ const ORT_VERSION = "1.20.1";
 const ORT_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 // DeepBump model. Fetched once and cached (Cache API). To serve it locally
 // instead, drop deepbump256.onnx next to this file and set DEFAULT_MODEL_URL to
-// "/deepbump256.onnx" (and add ".onnx" -> application/octet-stream in server.js).
+// "/deepbump256.onnx" (`web/server.js` already serves `.onnx` as
+// application/octet-stream).
 const DEFAULT_MODEL_URL =
   "https://raw.githubusercontent.com/HugoTini/DeepBump/master/deepbump256.onnx";
 const MODEL_CACHE = "deepbump-model-v1";

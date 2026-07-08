@@ -115,8 +115,10 @@ present. Consistent with the escape hatch: still reclaimable.
 
 ## Not in this plan, but shipped
 
-- **AI Map / normalcy integration** — `web/server.js` proxies to vendored
-  `third_party/normalcy` (`/api/normalcy/doctor`, `/api/normalcy/generate`),
-  with an AI overlay + preview mode in the UI (`c19e327`, `56eabfc`).
-  Predates this plan (2026-07-06) and is not referenced above; tracked here
-  so it isn't lost on the next review.
+- **AI normal map generator (DeepBump in the browser)** — `web/src/App.jsx`
+  spawns `web/deepbump.worker.js` as a Web Worker that runs DeepBump
+  inference via `onnxruntime-web` (loaded from CDN, single-threaded WASM,
+  no COOP/COEP). AI tab in `web/src/ControlsPanel.jsx` exposes Strength /
+  Smooth / Steps (live) and Denoise / Overlap (regenerate). The model can be
+  self-hosted by dropping `deepbump256.onnx` next to the worker and editing
+  `DEFAULT_MODEL_URL`. Scope is normal maps only — no specular/roughness/AO.

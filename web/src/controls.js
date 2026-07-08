@@ -31,15 +31,6 @@ export const DEFAULT_LIGHT_CONTROLS = {
   lightHeight: 30,
 };
 
-export const DEFAULT_AI = {
-  uvPath: "uv",
-  device: "auto",
-  modelSize: "vits",
-  volume: 1,
-  extrude: 4,
-  blend: 65,
-};
-
 // Controls for the in-browser DeepBump pipeline (AI tab). `overlap` is the one
 // native DeepBump knob — tile stride / seam blending, not strength.
 export const DEFAULT_AI_CONTROLS = {
@@ -51,8 +42,6 @@ export const DEFAULT_AI_CONTROLS = {
   smooth: 0, // post blur radius (px); 0 = off
   steps: 0, // normal-direction quantization for pixel-art facets; 0 = off
 };
-
-export const AI_STORAGE_KEY = "normalizer.ai";
 
 export function buildNormalParams(controls) {
   return {
@@ -67,22 +56,4 @@ export function buildNormalParams(controls) {
     invertZ: false,
     useAlpha: controls.useAlpha,
   };
-}
-
-export function loadAiSettings() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(AI_STORAGE_KEY) || "{}");
-    return { ...DEFAULT_AI, ...saved };
-  } catch {
-    localStorage.removeItem(AI_STORAGE_KEY);
-    return { ...DEFAULT_AI };
-  }
-}
-
-export function saveAiSettings(settings) {
-  try {
-    localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // localStorage may be disabled (private mode, quota); ignore.
-  }
 }

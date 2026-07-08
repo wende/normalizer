@@ -22,7 +22,7 @@ smoke: $(CLI_BIN)
 	$(CLI_BIN) normal laigter/images/sample.png $(SMOKE_OUT)
 
 web:
-	node web/server.js
+	npx vite --port $(WEB_PORT) --strictPort
 
 web-static:
 	python3 -m http.server $(WEB_PORT)

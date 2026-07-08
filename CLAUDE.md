@@ -30,7 +30,7 @@ All commands are run from the repo root.
 | Static file server (no API) | `make web-static` |
 | Clean build artifacts | `make clean` |
 
-The web server proxies to a vendored `third_party/normalcy` (UV-driven AI generator) for the "AI Map" preview mode — `/api/normalcy/doctor` and `/api/normalcy/generate`. No DB, no native assets.
+The web server is static-only; it serves `web/`, `laigter/`, and `shared/`. No DB, no API endpoints, no native assets. AI generation runs entirely in the browser via `web/deepbump.worker.js`.
 
 ## Architecture
 
@@ -63,7 +63,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 ### Web server (`web/server.js`)
 
 - Serves `web/` statically; also serves `laigter/` and `shared/` from repo root (used by the browser to load upstream sample images and shared modules).
-- `GET /api/normalcy/doctor` and `POST /api/normalcy/generate` shell out to `uv run --project third_party/normalcy normalcy …`. `device=auto` falls back to `cpu` on failure.
+- The AI pipeline runs DeepBump via `web/deepbump.worker.js` in a Web Worker — no server endpoint is involved. The worker loads `onnxruntime-web` from a CDN, fetches and caches `deepbump256.onnx`, and runs tiled inference. See `web/README.md` for the controls and local-model fallback.
 
 ## Conventions
 
@@ -86,4 +86,4 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 - The browser and CLI both load `shared/` modules directly. Editing `shared/normal.js` affects both; verify with `make js-smoke` after non-trivial changes.
 - `alphaDistance` is the most expensive primitive and is currently recomputed on every slider tick in `web/app.js`. Cache hooks are planned in `JS_CORE_MIGRATION.md` §5.8 but not yet wired.
 - `gaussianBlur` diverges from CImg by a few LSB at borders / large sigma; this is accepted under "free to diverge" but documented in the function header.
-- The web server reads `third_party/normalcy/` — keep that submodule in sync if the AI preview mode matters.
+- The web server is static-only — no server-side dependency is required for the AI pipeline. To run offline, drop `deepbump256.onnx` next to `web/deepbump.worker.js` and point `DEFAULT_MODEL_URL` at it.
