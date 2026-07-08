@@ -1,5 +1,7 @@
 import { RangeRow } from "./RangeRow.jsx";
 import { ToggleRow, ColorRow } from "./ToggleRow.jsx";
+import { ControlCard } from "./ControlCard.jsx";
+import { PillSwitch } from "./PillSwitch.jsx";
 import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL } from "./controls.js";
 
 const PIPELINES = [
@@ -7,8 +9,6 @@ const PIPELINES = [
   { id: "ai", label: "AI" },
 ];
 
-// Tabs depend on the active pipeline. "Light" is shared; the second tab is the
-// pipeline-specific map controls.
 const TABS = {
   procedural: [
     { id: "light", label: "Light" },
@@ -47,282 +47,278 @@ export function ControlsPanel({
 
   return (
     <aside class="controls" aria-label="Controls">
-      <div class="pipeline-switch segmented" role="group" aria-label="Generator">
-        {PIPELINES.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            class={pipeline === p.id ? "active" : ""}
-            aria-pressed={pipeline === p.id ? "true" : "false"}
-            data-pipeline={p.id}
-            onClick={() => onPipelineChange(p.id)}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
+      <PillSwitch
+        options={PIPELINES}
+        value={pipeline}
+        onChange={onPipelineChange}
+        ariaLabel="Generator"
+      />
 
-      <div class="control-tabs segmented" role="tablist" aria-label="Control panels">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            class={tab === t.id ? "active" : ""}
-            aria-selected={tab === t.id ? "true" : "false"}
-            data-control-tab={t.id}
-            onClick={() => onTabChange(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <PillSwitch
+        options={tabs}
+        value={tab}
+        onChange={onTabChange}
+        compact
+        ariaLabel="Control panels"
+      />
 
-      {/* Light panel — shared by both pipelines (drives Lit / Split views). */}
+      {tab === "light" && (
       <div
-        class={tab === "light" ? "control-panel active" : "control-panel"}
+        class="control-panel active"
         id="lightPanel"
         role="tabpanel"
         data-control-tab="light"
-        hidden={tab !== "light"}
       >
-        <div class="toggles preview-toggles">
-          <ToggleRow
-            id="pixelated"
-            checked={lightControls.pixelated}
-            onChange={(v) => onLightControlsChange({ pixelated: v })}
-          >
-            Pixelated
-          </ToggleRow>
-          <ToggleRow
-            id="toon"
-            checked={lightControls.toon}
-            onChange={(v) => onLightControlsChange({ toon: v })}
-          >
-            Toon
-          </ToggleRow>
-        </div>
+        <ControlCard title="Display">
+          <div class="toggles">
+            <ToggleRow
+              id="pixelated"
+              checked={lightControls.pixelated}
+              onChange={(v) => onLightControlsChange({ pixelated: v })}
+            >
+              Pixelated
+            </ToggleRow>
+            <ToggleRow
+              id="toon"
+              checked={lightControls.toon}
+              onChange={(v) => onLightControlsChange({ toon: v })}
+            >
+              Toon
+            </ToggleRow>
+          </div>
+        </ControlCard>
 
-        <div class="subsection-title">Diffuse</div>
-        <RangeRow
-          label="Intensity"
-          id="diffuseIntensity"
-          min={0}
-          max={400}
-          value={lightControls.diffuseIntensity}
-          onChange={(v) => onLightControlsChange({ diffuseIntensity: v })}
-        />
+        <ControlCard title="Diffuse">
+          <RangeRow
+            label="Intensity"
+            id="diffuseIntensity"
+            min={0}
+            max={400}
+            value={lightControls.diffuseIntensity}
+            onChange={(v) => onLightControlsChange({ diffuseIntensity: v })}
+          />
+        </ControlCard>
 
-        <div class="subsection-title">Specular</div>
-        <RangeRow
-          label="Intensity"
-          id="specularIntensity"
-          min={0}
-          max={400}
-          value={lightControls.specularIntensity}
-          onChange={(v) => onLightControlsChange({ specularIntensity: v })}
-        />
-        <RangeRow
-          label="Scatter"
-          id="specularScatter"
-          min={1}
-          max={255}
-          value={lightControls.specularScatter}
-          onChange={(v) => onLightControlsChange({ specularScatter: v })}
-        />
+        <ControlCard title="Specular">
+          <RangeRow
+            label="Intensity"
+            id="specularIntensity"
+            min={0}
+            max={400}
+            value={lightControls.specularIntensity}
+            onChange={(v) => onLightControlsChange({ specularIntensity: v })}
+          />
+          <RangeRow
+            label="Scatter"
+            id="specularScatter"
+            min={1}
+            max={255}
+            value={lightControls.specularScatter}
+            onChange={(v) => onLightControlsChange({ specularScatter: v })}
+          />
+        </ControlCard>
 
-        <div class="subsection-title">Ambient</div>
-        <RangeRow
-          label="Intensity"
-          id="ambientIntensity"
-          min={0}
-          max={100}
-          value={lightControls.ambientIntensity}
-          onChange={(v) => onLightControlsChange({ ambientIntensity: v })}
-        />
-        <ColorRow
-          label="Color"
-          id="ambientColor"
-          value={lightControls.ambientColor}
-          onChange={(v) => onLightControlsChange({ ambientColor: v })}
-        />
-        <ColorRow
-          label="Light Color"
-          id="lightColor"
-          value={lightControls.lightColor}
-          onChange={(v) => onLightControlsChange({ lightColor: v })}
-        />
-        <RangeRow
-          label="Height"
-          id="lightHeight"
-          min={-100}
-          max={100}
-          value={lightControls.lightHeight}
-          onChange={(v) => onLightControlsChange({ lightHeight: v })}
-        />
+        <ControlCard title="Ambient">
+          <RangeRow
+            label="Intensity"
+            id="ambientIntensity"
+            min={0}
+            max={100}
+            value={lightControls.ambientIntensity}
+            onChange={(v) => onLightControlsChange({ ambientIntensity: v })}
+          />
+          <ColorRow
+            label="Color"
+            id="ambientColor"
+            value={lightControls.ambientColor}
+            onChange={(v) => onLightControlsChange({ ambientColor: v })}
+          />
+        </ControlCard>
+
+        <ControlCard title="Light">
+          <ColorRow
+            label="Color"
+            id="lightColor"
+            value={lightControls.lightColor}
+            onChange={(v) => onLightControlsChange({ lightColor: v })}
+          />
+          <RangeRow
+            label="Height"
+            id="lightHeight"
+            min={-100}
+            max={100}
+            value={lightControls.lightHeight}
+            onChange={(v) => onLightControlsChange({ lightHeight: v })}
+          />
+        </ControlCard>
       </div>
+      )}
 
-      {/* Normal panel — procedural pipeline only. */}
+      {showNormal && (
       <div
-        class={showNormal ? "control-panel active" : "control-panel"}
+        class="control-panel active"
         id="normalPanel"
         role="tabpanel"
         data-control-tab="normal"
-        hidden={!showNormal}
       >
-        <div class="subsection-title">Enhance</div>
-        <RangeRow
-          label="Height"
-          id="normalDepth"
-          min={0}
-          max={4000}
-          value={normalControls.normalDepth}
-          onChange={(v) => onNormalControlsChange({ normalDepth: v })}
-        />
-        <RangeRow
-          label="Soft"
-          id="normalBlur"
-          min={0}
-          max={40}
-          value={normalControls.normalBlur}
-          onChange={(v) => onNormalControlsChange({ normalBlur: v })}
-        />
+        <ControlCard title="Enhance">
+          <RangeRow
+            label="Height"
+            id="normalDepth"
+            min={0}
+            max={4000}
+            value={normalControls.normalDepth}
+            onChange={(v) => onNormalControlsChange({ normalDepth: v })}
+          />
+          <RangeRow
+            label="Soft"
+            id="normalBlur"
+            min={0}
+            max={40}
+            value={normalControls.normalBlur}
+            onChange={(v) => onNormalControlsChange({ normalBlur: v })}
+          />
+        </ControlCard>
 
-        <div class="subsection-title">Bump</div>
-        <RangeRow
-          label="Height"
-          id="biselDepth"
-          min={0}
-          max={4000}
-          value={normalControls.biselDepth}
-          onChange={(v) => onNormalControlsChange({ biselDepth: v })}
-        />
-        <RangeRow
-          label="Distance"
-          id="biselDistance"
-          min={0}
-          max={255}
-          value={normalControls.biselDistance}
-          onChange={(v) => onNormalControlsChange({ biselDistance: v })}
-        />
-        <RangeRow
-          label="Soft"
-          id="biselBlur"
-          min={0}
-          max={40}
-          value={normalControls.biselBlur}
-          onChange={(v) => onNormalControlsChange({ biselBlur: v })}
-        />
-        <div class="radio-group" role="radiogroup" aria-label="Bump profile">
-          <label>
-            <input
-              type="radio"
-              name="biselProfile"
-              value="soft"
-              checked={normalControls.softBisel === true}
-              onChange={() => onNormalControlsChange({ softBisel: true })}
-            />
-            {" "}Soft
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="biselProfile"
-              value="abrupt"
-              checked={normalControls.softBisel === false}
-              onChange={() => onNormalControlsChange({ softBisel: false })}
-            />
-            {" "}Abrupt
-          </label>
-        </div>
+        <ControlCard title="Bump">
+          <RangeRow
+            label="Height"
+            id="biselDepth"
+            min={0}
+            max={4000}
+            value={normalControls.biselDepth}
+            onChange={(v) => onNormalControlsChange({ biselDepth: v })}
+          />
+          <RangeRow
+            label="Distance"
+            id="biselDistance"
+            min={0}
+            max={255}
+            value={normalControls.biselDistance}
+            onChange={(v) => onNormalControlsChange({ biselDistance: v })}
+          />
+          <RangeRow
+            label="Soft"
+            id="biselBlur"
+            min={0}
+            max={40}
+            value={normalControls.biselBlur}
+            onChange={(v) => onNormalControlsChange({ biselBlur: v })}
+          />
+          <div class="radio-group" role="radiogroup" aria-label="Bump profile">
+            <label>
+              <input
+                type="radio"
+                name="biselProfile"
+                value="soft"
+                checked={normalControls.softBisel === true}
+                onChange={() => onNormalControlsChange({ softBisel: true })}
+              />
+              {" "}Soft
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="biselProfile"
+                value="abrupt"
+                checked={normalControls.softBisel === false}
+                onChange={() => onNormalControlsChange({ softBisel: false })}
+              />
+              {" "}Abrupt
+            </label>
+          </div>
+        </ControlCard>
 
-        <div class="toggles">
-          <ToggleRow
-            id="useAlpha"
-            checked={normalControls.useAlpha}
-            onChange={(v) => onNormalControlsChange({ useAlpha: v })}
-          >
-            Use alpha
-          </ToggleRow>
-        </div>
+        <ControlCard title="Options">
+          <div class="toggles">
+            <ToggleRow
+              id="useAlpha"
+              checked={normalControls.useAlpha}
+              onChange={(v) => onNormalControlsChange({ useAlpha: v })}
+            >
+              Use alpha
+            </ToggleRow>
+          </div>
+        </ControlCard>
       </div>
+      )}
 
-      {/* AI panel — AI pipeline only. */}
+      {showAi && (
       <div
-        class={showAi ? "control-panel active" : "control-panel"}
+        class="control-panel active"
         id="aiPanel"
         role="tabpanel"
         data-control-tab="ai"
-        hidden={!showAi}
       >
-        <div class="subsection-title">Adjust</div>
-        <p class="hint">Applied live to the generated map — no regenerate needed.</p>
-        <RangeRow
-          label="Strength"
-          id="aiStrength"
-          min={0}
-          max={300}
-          step={5}
-          value={aiControls.strength}
-          onChange={(v) => onAiControlsChange({ strength: v })}
-          format={(v) => `${v}%`}
-        />
-        <RangeRow
-          label="Smooth"
-          id="aiSmooth"
-          min={0}
-          max={5}
-          step={1}
-          value={aiControls.smooth}
-          onChange={(v) => onAiControlsChange({ smooth: v })}
-          format={(v) => (v > 0 ? `${v}px` : "Off")}
-        />
-        <RangeRow
-          label="Steps"
-          id="aiSteps"
-          min={0}
-          max={5}
-          step={1}
-          value={aiControls.steps}
-          onChange={(v) => onAiControlsChange({ steps: v })}
-          format={(v) => (v > 0 ? `${2 * v + 1} lv` : "Off")}
-        />
-        <p class="hint">
-          Steps quantizes the normal into flat facets for a pixel-art look
-          (pairs well with higher Strength). Off = smooth gradient.
-        </p>
+        <ControlCard title="Adjust">
+          <p class="hint">Applied live to the generated map — no regenerate needed.</p>
+          <RangeRow
+            label="Strength"
+            id="aiStrength"
+            min={0}
+            max={300}
+            step={5}
+            value={aiControls.strength}
+            onChange={(v) => onAiControlsChange({ strength: v })}
+            format={(v) => `${v}%`}
+          />
+          <RangeRow
+            label="Smooth"
+            id="aiSmooth"
+            min={0}
+            max={5}
+            step={1}
+            value={aiControls.smooth}
+            onChange={(v) => onAiControlsChange({ smooth: v })}
+            format={(v) => (v > 0 ? `${v}px` : "Off")}
+          />
+          <RangeRow
+            label="Steps"
+            id="aiSteps"
+            min={0}
+            max={5}
+            step={1}
+            value={aiControls.steps}
+            onChange={(v) => onAiControlsChange({ steps: v })}
+            format={(v) => (v > 0 ? `${2 * v + 1} lv` : "Off")}
+          />
+          <p class="hint">
+            Steps quantizes the normal into flat facets for a pixel-art look
+            (pairs well with higher Strength). Off = smooth gradient.
+          </p>
+        </ControlCard>
 
-        <div class="subsection-title">Generation</div>
-        <p class="hint">These change the model input — Regenerate to apply.</p>
-        <RangeRow
-          label="Denoise"
-          id="aiDenoise"
-          min={0}
-          max={3}
-          step={1}
-          value={aiControls.denoise}
-          onChange={(v) => onAiControlsChange({ denoise: v })}
-          format={(v) => (v > 0 ? `${v}px` : "Off")}
-        />
-        <div class="radio-group" role="radiogroup" aria-label="Tile overlap">
-          {OVERLAPS.map((o) => (
-            <label key={o.id}>
-              <input
-                type="radio"
-                name="aiOverlap"
-                value={o.id}
-                checked={aiControls.overlap === o.id}
-                onChange={() => onAiControlsChange({ overlap: o.id })}
-              />
-              {" "}{o.label}
-            </label>
-          ))}
-        </div>
-        <p class="hint">Overlap: higher smooths tile seams (slower).</p>
+        <ControlCard title="Generation">
+          <p class="hint">These change the model input — Regenerate to apply.</p>
+          <RangeRow
+            label="Denoise"
+            id="aiDenoise"
+            min={0}
+            max={3}
+            step={1}
+            value={aiControls.denoise}
+            onChange={(v) => onAiControlsChange({ denoise: v })}
+            format={(v) => (v > 0 ? `${v}px` : "Off")}
+          />
+          <div class="radio-group" role="radiogroup" aria-label="Tile overlap">
+            {OVERLAPS.map((o) => (
+              <label key={o.id}>
+                <input
+                  type="radio"
+                  name="aiOverlap"
+                  value={o.id}
+                  checked={aiControls.overlap === o.id}
+                  onChange={() => onAiControlsChange({ overlap: o.id })}
+                />
+                {" "}{o.label}
+              </label>
+            ))}
+          </div>
+          <p class="hint">Overlap: higher smooths tile seams (slower).</p>
+        </ControlCard>
       </div>
+      )}
 
-      {/* Generate sits outside the tab panels so it's reachable from both the
-          Light and AI tabs of the AI pipeline. */}
       {pipeline === "ai" && (
         <div class="ai-generate-wrap">
           <button

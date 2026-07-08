@@ -71,6 +71,28 @@ export function pointHitsLight(point, light, source, rect) {
   );
 }
 
+export function splitDividerX(rect, splitRatio = 0.5) {
+  return rect.x + Math.round(rect.width * splitRatio);
+}
+
+export function canvasToSplitRatio(point, rect) {
+  const t = (point.x - rect.x) / rect.width;
+  return Math.max(0.02, Math.min(0.98, t));
+}
+
+export function pointHitsSplitDivider(point, rect, splitRatio = 0.5) {
+  if (!rect) return false;
+  const ratio = window.devicePixelRatio || 1;
+  const x = splitDividerX(rect, splitRatio);
+  const half = Math.max(10 * ratio, 8);
+  return (
+    point.x >= x - half &&
+    point.x <= x + half &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.height
+  );
+}
+
 // Linear blend in tangent space between the generated base normal and the AI
 // overlay, weighted by the AI blend fraction. Stays UI-side because it reads
 // caller state the shared generator has no knowledge of.
@@ -196,6 +218,7 @@ export function drawPreview({
   pixelated,
   draggingLight,
   lightSprite,
+  splitRatio = 0.5,
 }) {
   const ratio = window.devicePixelRatio || 1;
   const bounds = canvas.getBoundingClientRect();
@@ -232,18 +255,19 @@ export function drawPreview({
   } else if (mode === "normal") {
     drawImageData(ctx, normal, rect, pixelated);
   } else {
+    const splitX = splitDividerX(rect, splitRatio);
     drawImageData(ctx, source, rect, pixelated);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(rect.x + Math.round(rect.width / 2), rect.y, Math.ceil(rect.width / 2), rect.height);
+    ctx.rect(splitX, rect.y, rect.x + rect.width - splitX, rect.height);
     ctx.clip();
     drawImageData(ctx, litCache || normal, rect, pixelated);
     ctx.restore();
     ctx.strokeStyle = "#fffefa";
     ctx.lineWidth = Math.max(1, Math.round(2 * ratio));
     ctx.beginPath();
-    ctx.moveTo(rect.x + Math.round(rect.width / 2), rect.y);
-    ctx.lineTo(rect.x + Math.round(rect.width / 2), rect.y + rect.height);
+    ctx.moveTo(splitX, rect.y);
+    ctx.lineTo(splitX, rect.y + rect.height);
     ctx.stroke();
   }
   drawLightHandle(ctx, light, source, rect, draggingLight, lightSprite);

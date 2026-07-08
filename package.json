@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Laigter-derived normal/texture-map generator with a dependency-free JS core shared by the browser app and a Node CLI.",
   "license": "GPL-3.0",
+  "scripts": {
+    "test:e2e": "playwright test --config web/playwright.config.js"
+  },
   "dependencies": {
     "pngjs": "^7.0.0",
     "preact": "^10.22.0",
@@ -12,6 +15,8 @@
   },
   "devDependencies": {
     "@locator/babel-jsx": "^0.5.1",
+    "@playwright/test": "^1.61.1",
+    "@preact/preset-vite": "^2.10.5",
     "@treelocator/runtime": "file:../treelocatorjs/packages/runtime",
     "@treelocator/vite": "file:../treelocatorjs/packages/vite"
   }

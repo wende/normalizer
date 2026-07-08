@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 import { Toolbar } from "./Toolbar.jsx";
+import { PreviewTabBar } from "./PreviewTabBar.jsx";
 import { PreviewArea } from "./PreviewArea.jsx";
 import { ControlsPanel } from "./ControlsPanel.jsx";
 import {
@@ -30,6 +31,8 @@ export function App() {
   const [aiBusy, setAiBusy] = useState(false);
   const [pipeline, setPipeline] = useState("procedural"); // "procedural" | "ai"
   const [mode, setMode] = useState("split"); // preview view
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [draggingSplit, setDraggingSplit] = useState(false);
   const [tab, setTab] = useState("light"); // controls tab
   const [status, setStatus] = useState("Ready");
   const [light, setLight] = useState({ x: 0, y: 0 });
@@ -165,14 +168,21 @@ export function App() {
     mode,
     pipeline,
     light,
+    splitRatio,
     lightSettings: buildLightSettings(light, lightControls),
     toon: lightControls.toon,
     pixelated: lightControls.pixelated,
     draggingLight: draggingLight.current,
+    draggingSplit,
     lightSprite: lightSprite.current,
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
-  }), [source, activeNormal, mode, pipeline, light, lightControls]);
+    onSplitDragChange: setDraggingSplit,
+  }), [source, activeNormal, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
+
+  const onSplitRatioChange = useCallback((next) => {
+    setSplitRatio((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
+  }, []);
 
   const onLightMove = useCallback((canvasPoint) => {
     if (!source || !lastRect.current) return;
@@ -226,16 +236,20 @@ export function App() {
         onLoadSample={loadSample}
         onExport={() => exportNormalPng(activeNormal)}
       />
+      <PreviewTabBar
+        mode={mode}
+        onModeChange={setMode}
+        status={status}
+      />
       <section class="workspace">
-        <PreviewArea
-          mode={mode}
-          onModeChange={setMode}
-          status={status}
-          drawArgs={drawArgs}
-          onLightMove={onLightMove}
-          lightSprite={lightSprite.current}
-          lastRectRef={lastRect}
-        />
+          <PreviewArea
+            drawArgs={drawArgs}
+            onLightMove={onLightMove}
+            onSplitRatioChange={onSplitRatioChange}
+            splitRatio={splitRatio}
+            lightSprite={lightSprite.current}
+            lastRectRef={lastRect}
+          />
         <ControlsPanel
           pipeline={pipeline}
           onPipelineChange={onPipelineChange}

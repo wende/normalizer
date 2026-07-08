@@ -1,24 +1,32 @@
 import { useEffect, useRef } from "preact/hooks";
 import {
   canvasPointFromEvent,
+  canvasToSplitRatio,
   drawAiPlaceholder,
   drawLightHandle,
   drawPreview,
   pointHitsLight,
+  pointHitsSplitDivider,
   renderLit,
+  splitDividerX,
 } from "./previewRender.js";
 import { createLitGL } from "./litGL.js";
 
-const MODES = [
-  { id: "split", label: "Split" },
-  { id: "lit", label: "Lit" },
-  { id: "normal", label: "Normal" },
-  { id: "diffuse", label: "Diffuse" },
-];
+function drawSplitDivider(octx, rect, splitRatio, dragging) {
+  const ratio = window.devicePixelRatio || 1;
+  const x = splitDividerX(rect, splitRatio);
+  octx.save();
+  octx.strokeStyle = dragging ? "#ffffff" : "#fffefa";
+  octx.lineWidth = dragging ? Math.max(2, Math.round(3 * ratio)) : Math.max(1, Math.round(2 * ratio));
+  octx.beginPath();
+  octx.moveTo(x, rect.y);
+  octx.lineTo(x, rect.y + rect.height);
+  octx.stroke();
+  octx.restore();
+}
 
-// Canvas2D overlay painted on top of the WebGL canvas: just the light handle,
-// the split divider, and the AI "not generated yet" hint. Transparent except
-// for these, so the GPU image shows through.
+// Canvas2D overlay painted on top of the WebGL canvas: light handle, split
+// divider, and the AI "not generated yet" hint. Transparent except for these.
 function drawOverlay(octx, canvas, drawArgs, rect) {
   octx.clearRect(0, 0, canvas.width, canvas.height);
   if (!rect) {
@@ -28,23 +36,16 @@ function drawOverlay(octx, canvas, drawArgs, rect) {
     return;
   }
   if (drawArgs.mode === "split") {
-    const ratio = window.devicePixelRatio || 1;
-    const x = rect.x + Math.round(rect.width / 2);
-    octx.strokeStyle = "#fffefa";
-    octx.lineWidth = Math.max(1, Math.round(2 * ratio));
-    octx.beginPath();
-    octx.moveTo(x, rect.y);
-    octx.lineTo(x, rect.y + rect.height);
-    octx.stroke();
+    drawSplitDivider(octx, rect, drawArgs.splitRatio ?? 0.5, drawArgs.draggingSplit);
   }
   drawLightHandle(octx, drawArgs.light, drawArgs.source, rect, drawArgs.draggingLight, drawArgs.lightSprite);
 }
 
-// No-WebGL2 fallback: render lit pixels on the CPU and draw everything onto
-// the single overlay canvas. Same speed as before — only hits machines that
-// can't acquire a WebGL2 context.
 function cpuFallback(overlay, octx, drawArgs) {
-  const { source, normal, mode, pipeline, light, pixelated, draggingLight, lightSprite, lightSettings, toon } = drawArgs;
+  const {
+    source, normal, mode, pipeline, light, pixelated, draggingLight, lightSprite,
+    lightSettings, toon, splitRatio,
+  } = drawArgs;
   const litCache = source && normal ? renderLit(source, normal, lightSettings, toon) : null;
   return drawPreview({
     canvas: overlay,
@@ -58,10 +59,11 @@ function cpuFallback(overlay, octx, drawArgs) {
     pixelated,
     draggingLight,
     lightSprite,
+    splitRatio,
   });
 }
 
-function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs) {
+function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
   if (!glCanvas || !overlay) return;
   if (!glInitRef.current) {
     glRef.current = createLitGL(glCanvas);
@@ -78,6 +80,7 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs) {
       lightSettings: drawArgs.lightSettings,
       toon: drawArgs.toon,
       pixelated: drawArgs.pixelated,
+      splitRatio: drawArgs.splitRatio ?? 0.5,
     });
     if (overlay.width !== glCanvas.width || overlay.height !== glCanvas.height) {
       overlay.width = glCanvas.width;
@@ -88,96 +91,114 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs) {
     rect = cpuFallback(overlay, octx, drawArgs);
   }
   drawArgs.onRectChange(rect);
+  if (stageEl && rect && glCanvas.width > 0) {
+    stageEl.dataset.imageLeft = String(rect.x / glCanvas.width);
+    stageEl.dataset.imageWidth = String(rect.width / glCanvas.width);
+    stageEl.dataset.imageTop = String(rect.y / glCanvas.height);
+    stageEl.dataset.imageHeight = String(rect.height / glCanvas.height);
+  }
 }
 
 export function PreviewArea({
-  mode,
-  onModeChange,
-  status,
   drawArgs,
   onLightMove,
+  onSplitRatioChange,
+  splitRatio,
   lightSprite,
   lastRectRef,
 }) {
   const glCanvasRef = useRef(null);
   const canvasRef = useRef(null);
+  const stageRef = useRef(null);
   const glRef = useRef(null);
   const glInitRef = useRef(false);
-  const dragState = useRef({ dragging: false, pointerId: null });
+  const dragState = useRef({ kind: null, pointerId: null });
 
-  // Imperative redraw on every relevant state change. drawArgs is rebuilt by
-  // App on every render so this effect always runs with the latest snapshot.
   useEffect(() => {
-    paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs);
+    paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs, stageRef.current);
   }, [drawArgs]);
 
-  // Resize-driven redraw — Preact won't see browser resize events.
   useEffect(() => {
-    const handle = () => paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs);
+    const handle = () => paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs, stageRef.current);
     window.addEventListener("resize", handle);
     return () => window.removeEventListener("resize", handle);
   }, [drawArgs]);
 
   const eventPoint = (e) => canvasPointFromEvent(canvasRef.current, e);
 
+  const updateCursor = (point) => {
+    const canvas = canvasRef.current;
+    const rect = lastRectRef.current;
+    const source = drawArgs.source;
+    if (!canvas || !source || !rect) {
+      canvas.style.cursor = "";
+      return;
+    }
+    if (drawArgs.mode === "split" && pointHitsSplitDivider(point, rect, splitRatio)) {
+      canvas.style.cursor = "col-resize";
+      return;
+    }
+    canvas.style.cursor = pointHitsLight(point, drawArgs.light, source, rect) ? "grab" : "";
+  };
+
   const handlePointerDown = (e) => {
     const point = eventPoint(e);
     const rect = lastRectRef.current;
     const source = drawArgs.source;
     if (!source || !rect) return;
+
+    if (drawArgs.mode === "split" && pointHitsSplitDivider(point, rect, splitRatio)) {
+      e.preventDefault();
+      dragState.current = { kind: "split", pointerId: e.pointerId };
+      canvasRef.current.setPointerCapture(e.pointerId);
+      canvasRef.current.style.cursor = "col-resize";
+      drawArgs.onSplitDragChange(true);
+      onSplitRatioChange(canvasToSplitRatio(point, rect));
+      return;
+    }
+
     if (!pointHitsLight(point, drawArgs.light, source, rect)) return;
     e.preventDefault();
-    dragState.current = { dragging: true, pointerId: e.pointerId };
+    dragState.current = { kind: "light", pointerId: e.pointerId };
     canvasRef.current.setPointerCapture(e.pointerId);
     canvasRef.current.style.cursor = "grabbing";
     drawArgs.onDragChange(true);
   };
 
   const handlePointerMove = (e) => {
-    if (!dragState.current.dragging) {
-      const point = eventPoint(e);
-      const source = drawArgs.source;
+    const point = eventPoint(e);
+    if (dragState.current.kind === "split") {
+      e.preventDefault();
       const rect = lastRectRef.current;
-      const hits = source && rect
-        ? pointHitsLight(point, drawArgs.light, source, rect)
-        : false;
-      canvasRef.current.style.cursor = hits ? "grab" : "";
+      if (rect) onSplitRatioChange(canvasToSplitRatio(point, rect));
       return;
     }
-    e.preventDefault();
-    onLightMove(eventPoint(e));
+    if (dragState.current.kind === "light") {
+      e.preventDefault();
+      onLightMove(point);
+      return;
+    }
+    updateCursor(point);
   };
 
   const stopDrag = (e) => {
-    if (!dragState.current.dragging) return;
+    if (!dragState.current.kind) return;
     const canvas = canvasRef.current;
     if (canvas && canvas.hasPointerCapture(e.pointerId)) {
       canvas.releasePointerCapture(e.pointerId);
     }
-    dragState.current = { dragging: false, pointerId: null };
-    canvas.style.cursor = "";
-    drawArgs.onDragChange(false);
+    if (dragState.current.kind === "light") {
+      drawArgs.onDragChange(false);
+    } else if (dragState.current.kind === "split") {
+      drawArgs.onSplitDragChange(false);
+    }
+    dragState.current = { kind: null, pointerId: null };
+    updateCursor(eventPoint(e));
   };
 
   return (
     <section class="preview-area" aria-label="Preview">
-      <div class="preview-head">
-        <div class="segmented" role="group" aria-label="Preview mode">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              class={mode === m.id ? "active" : ""}
-              data-mode={m.id}
-              onClick={() => onModeChange(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <output id="status">{status}</output>
-      </div>
-      <div class="preview-stage">
+      <div class="preview-stage" ref={stageRef} data-split-ratio={splitRatio}>
         <canvas id="previewGL" ref={glCanvasRef} width="960" height="640" />
         <canvas
           id="previewCanvas"

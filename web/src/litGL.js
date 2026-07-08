@@ -185,7 +185,7 @@ export function createLitGL(canvas) {
    * `normal` is the active normal for the current pipeline (procedural or AI).
    */
   function draw(state) {
-    const { source, normal, mode, lightSettings, toon, pixelated } = state;
+    const { source, normal, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
     const ratio = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
     const cw = Math.max(320, Math.round(bounds.width * ratio));
@@ -219,11 +219,11 @@ export function createLitGL(canvas) {
     } else if (mode === "lit") {
       drawLit(source, normal, lightSettings, toon, pixelated);
     } else {
-      // split: diffuse underneath, lit over the right half.
+      // split: diffuse underneath, lit over the right portion.
       drawPassthrough("source", source, pixelated);
-      const half = Math.round(rect.width / 2);
+      const splitPx = Math.round(rect.width * splitRatio);
       gl.enable(gl.SCISSOR_TEST);
-      gl.scissor(rect.x + half, ch - rect.y - rect.height, rect.width - half, rect.height);
+      gl.scissor(rect.x + splitPx, ch - rect.y - rect.height, rect.width - splitPx, rect.height);
       drawLit(source, normal, lightSettings, toon, pixelated);
       gl.disable(gl.SCISSOR_TEST);
     }
