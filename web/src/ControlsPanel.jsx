@@ -2,7 +2,7 @@ import { RangeRow } from "./RangeRow.jsx";
 import { ToggleRow, ColorRow } from "./ToggleRow.jsx";
 import { ControlCard } from "./ControlCard.jsx";
 import { PillSwitch } from "./PillSwitch.jsx";
-import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL } from "./controls.js";
+import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL, DEFAULT_SPECULAR } from "./controls.js";
 
 const PIPELINES = [
   { id: "procedural", label: "Procedural" },
@@ -13,6 +13,7 @@ const TABS = {
   procedural: [
     { id: "light", label: "Light" },
     { id: "normal", label: "Normal" },
+    { id: "specular", label: "Specular" },
   ],
   ai: [
     { id: "light", label: "Light" },
@@ -33,6 +34,8 @@ export function ControlsPanel({
   onTabChange,
   normalControls,
   onNormalControlsChange,
+  specularControls,
+  onSpecularControlsChange,
   lightControls,
   onLightControlsChange,
   aiControls,
@@ -43,6 +46,7 @@ export function ControlsPanel({
 }) {
   const tabs = TABS[pipeline] || TABS.procedural;
   const showNormal = pipeline === "procedural" && tab === "normal";
+  const showSpecular = pipeline === "procedural" && tab === "specular";
   const showAi = pipeline === "ai" && tab === "ai";
 
   return (
@@ -243,6 +247,71 @@ export function ControlsPanel({
       </div>
       )}
 
+      {showSpecular && (
+      <div
+        class="control-panel active"
+        id="specularPanel"
+        role="tabpanel"
+        data-control-tab="specular"
+      >
+        <ControlCard title="Tone">
+          <RangeRow
+            label="Contrast"
+            id="specularContrast"
+            min={1}
+            max={4000}
+            step={1}
+            value={specularControls.specularContrast}
+            onChange={(v) => onSpecularControlsChange({ specularContrast: v })}
+            format={(v) => (v / 1000).toFixed(3)}
+          />
+          <RangeRow
+            label="Threshold"
+            id="specularThresh"
+            min={0}
+            max={255}
+            value={specularControls.specularThresh}
+            onChange={(v) => onSpecularControlsChange({ specularThresh: v })}
+          />
+          <RangeRow
+            label="Brightness"
+            id="specularBright"
+            min={-255}
+            max={255}
+            value={specularControls.specularBright}
+            onChange={(v) => onSpecularControlsChange({ specularBright: v })}
+          />
+          <RangeRow
+            label="Blur"
+            id="specularBlur"
+            min={0}
+            max={50}
+            value={specularControls.specularBlur}
+            onChange={(v) => onSpecularControlsChange({ specularBlur: v })}
+          />
+        </ControlCard>
+
+        <ControlCard title="Options">
+          <div class="toggles">
+            <ToggleRow
+              id="specularInvert"
+              checked={specularControls.specularInvert}
+              onChange={(v) => onSpecularControlsChange({ specularInvert: v })}
+            >
+              Invert
+            </ToggleRow>
+            <ToggleRow
+              id="specularUseAlpha"
+              checked={specularControls.useAlpha}
+              onChange={(v) => onSpecularControlsChange({ useAlpha: v })}
+            >
+              Use alpha
+            </ToggleRow>
+          </div>
+        </ControlCard>
+      </div>
+      )}
+
       {showAi && (
       <div
         class="control-panel active"
@@ -342,3 +411,4 @@ export function ControlsPanel({
 
 ControlsPanel.defaultLightControls = DEFAULT_LIGHT_CONTROLS;
 ControlsPanel.defaultNormalControls = DEFAULT_NORMAL;
+ControlsPanel.defaultSpecularControls = DEFAULT_SPECULAR;

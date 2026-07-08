@@ -1,8 +1,9 @@
 const MODES = [
+  { id: "base", label: "Base" },
   { id: "split", label: "Split" },
   { id: "lit", label: "Lit" },
   { id: "normal", label: "Normal" },
-  { id: "diffuse", label: "Diffuse" },
+  { id: "specular", label: "Specular" },
 ];
 
 export function PreviewTabBar({ mode, onModeChange, status }) {

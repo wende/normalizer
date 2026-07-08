@@ -57,3 +57,26 @@ export function buildNormalParams(controls) {
     useAlpha: controls.useAlpha,
   };
 }
+
+// Specular-map UI values. Contrast is a UI int 1-4000; buildSpecularParams
+// divides by 1000 to get the 0.001-4.0 float the engine wants. Blur UI default
+// is 10 (prettier out-of-box); the shared/CLI default is 3.
+export const DEFAULT_SPECULAR = {
+  specularThresh: 127,
+  specularContrast: 1000,
+  specularBright: 0,
+  specularBlur: 10,
+  specularInvert: false,
+  useAlpha: false,
+};
+
+export function buildSpecularParams(controls) {
+  return {
+    specularThresh: Number(controls.specularThresh),
+    specularContrast: Number(controls.specularContrast) / 1000,
+    specularBright: Number(controls.specularBright),
+    specularBlur: Number(controls.specularBlur),
+    specularInvert: controls.specularInvert,
+    useAlpha: controls.useAlpha,
+  };
+}

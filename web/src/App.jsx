@@ -8,13 +8,16 @@ import {
   DEFAULT_AI_CONTROLS,
   DEFAULT_LIGHT_CONTROLS,
   DEFAULT_NORMAL,
+  DEFAULT_SPECULAR,
   buildNormalParams,
+  buildSpecularParams,
 } from "./controls.js";
 import {
   buildLightSettings,
   drawPreview,
-  exportNormalPng,
+  exportPng,
   generateNormal,
+  generateSpecular,
   readSourceFromImage,
   canvasToLight,
 } from "./previewRender.js";
@@ -27,6 +30,7 @@ const SAMPLE_LOAD_ERROR = "Could not load sample image.";
 export function App() {
   const [source, setSource] = useState(null);
   const [proceduralNormal, setProceduralNormal] = useState(null);
+  const [specularMap, setSpecularMap] = useState(null);
   const [aiOverlay, setAiOverlay] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [pipeline, setPipeline] = useState("procedural"); // "procedural" | "ai"
@@ -37,12 +41,14 @@ export function App() {
   const [status, setStatus] = useState("Ready");
   const [light, setLight] = useState({ x: 0, y: 0 });
   const [normalControls, setNormalControls] = useState(DEFAULT_NORMAL);
+  const [specularControls, setSpecularControls] = useState(DEFAULT_SPECULAR);
   const [lightControls, setLightControls] = useState(DEFAULT_LIGHT_CONTROLS);
   const [aiControls, setAiControls] = useState(DEFAULT_AI_CONTROLS);
   const lastRect = useRef(null);
   const draggingLight = useRef(false);
   const lightSprite = useRef(null);
   const generateTimer = useRef(0);
+  const specularTimer = useRef(0);
   const aiWorker = useRef(null);
 
   // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
@@ -72,6 +78,9 @@ export function App() {
 
   const onNormalControlsChange = useCallback((patch) => {
     setNormalControls((prev) => ({ ...prev, ...patch }));
+  }, []);
+  const onSpecularControlsChange = useCallback((patch) => {
+    setSpecularControls((prev) => ({ ...prev, ...patch }));
   }, []);
   const onLightControlsChange = useCallback((patch) => {
     setLightControls((prev) => ({ ...prev, ...patch }));
@@ -160,11 +169,23 @@ export function App() {
     return () => clearTimeout(generateTimer.current);
   }, [source, normalControls]);
 
+  // Specular map — recomputed (debounced) from the source + specular sliders.
+  useEffect(() => {
+    if (!source) return;
+    clearTimeout(specularTimer.current);
+    specularTimer.current = setTimeout(() => {
+      const params = buildSpecularParams(specularControls);
+      setSpecularMap(generateSpecular(source, params));
+    }, 40);
+    return () => clearTimeout(specularTimer.current);
+  }, [source, specularControls]);
+
   // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
   // only update a shader uniform, so no ImageData is rebuilt per drag here.
   const drawArgs = useMemo(() => ({
     source,
     normal: activeNormal,
+    specular: specularMap,
     mode,
     pipeline,
     light,
@@ -178,7 +199,7 @@ export function App() {
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
     onSplitDragChange: setDraggingSplit,
-  }), [source, activeNormal, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
+  }), [source, activeNormal, specularMap, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
 
   const onSplitRatioChange = useCallback((next) => {
     setSplitRatio((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
@@ -234,7 +255,11 @@ export function App() {
       <Toolbar
         onOpenFile={onOpenFile}
         onLoadSample={loadSample}
-        onExport={() => exportNormalPng(activeNormal)}
+        onExport={() => (
+          mode === "specular"
+            ? exportPng(specularMap, "laigter-specular.png")
+            : exportPng(activeNormal, "laigter-normal.png")
+        )}
       />
       <PreviewTabBar
         mode={mode}
@@ -257,6 +282,8 @@ export function App() {
           onTabChange={setTab}
           normalControls={normalControls}
           onNormalControlsChange={onNormalControlsChange}
+          specularControls={specularControls}
+          onSpecularControlsChange={onSpecularControlsChange}
           lightControls={lightControls}
           onLightControlsChange={onLightControlsChange}
           aiControls={aiControls}

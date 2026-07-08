@@ -5,6 +5,7 @@
  */
 
 import { generateNormalMap } from "shared/normal.js";
+import { generateSpecularMap } from "shared/specular.js";
 import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "shared/preview.js";
 
 export function hexToRgb01(hex) {
@@ -129,8 +130,13 @@ export function generateNormal(source, params, overlay = null, blend = 0) {
   return blendNormalOverlay(baseImage, source, overlay, blend);
 }
 
-export function renderLit(source, normal, lightSettings, toon) {
-  const out = buildLitPreview(source, normal, lightSettings, toon);
+export function generateSpecular(source, params) {
+  const out = generateSpecularMap(source, params);
+  return new ImageData(out.data, out.width, out.height);
+}
+
+export function renderLit(source, normal, lightSettings, toon, specular = null) {
+  const out = buildLitPreview(source, normal, lightSettings, toon, specular);
   return new ImageData(out.data, out.width, out.height);
 }
 
@@ -211,6 +217,7 @@ export function drawPreview({
   ctx,
   source,
   normal,
+  specular,
   litCache,
   mode,
   pipeline,
@@ -236,20 +243,25 @@ export function drawPreview({
     return null;
   }
 
-  // Only the Diffuse view can render without a normal map. Everything else
-  // needs one — and in the AI pipeline, "no normal yet" means "not generated",
-  // so show a hint rather than a blank (or a misleading procedural fallback).
-  const needsNormal = mode !== "diffuse";
+  // Only the Base view renders without a generated map. Specular needs the
+  // specular map; Split/Lit/Normal need a normal map — and in the AI pipeline
+  // "no normal yet" means "not generated", so show a hint rather than a blank.
+  const needsNormal = mode !== "base" && mode !== "specular";
   if (needsNormal && !normal) {
     if (pipeline === "ai") {
       drawAiPlaceholder(ctx, canvas);
     }
     return null;
   }
+  if (mode === "specular" && !specular) {
+    return null;
+  }
 
   const rect = fitRect(source.width, source.height, canvas.width - 48, canvas.height - 48);
-  if (mode === "diffuse") {
+  if (mode === "base") {
     drawImageData(ctx, source, rect, pixelated);
+  } else if (mode === "specular") {
+    drawImageData(ctx, specular, rect, pixelated);
   } else if (mode === "lit") {
     drawImageData(ctx, litCache || normal, rect, pixelated);
   } else if (mode === "normal") {
@@ -286,14 +298,14 @@ export function readSourceFromImage(image) {
   return sourceCtx.getImageData(0, 0, width, height);
 }
 
-export function exportNormalPng(normal) {
-  if (!normal) return;
+export function exportPng(image, filename) {
+  if (!image) return;
   const canvas = document.createElement("canvas");
-  canvas.width = normal.width;
-  canvas.height = normal.height;
-  canvas.getContext("2d").putImageData(normal, 0, 0);
+  canvas.width = image.width;
+  canvas.height = image.height;
+  canvas.getContext("2d").putImageData(image, 0, 0);
   const a = document.createElement("a");
-  a.download = "laigter-normal.png";
+  a.download = filename;
   a.href = canvas.toDataURL("image/png");
   a.click();
 }

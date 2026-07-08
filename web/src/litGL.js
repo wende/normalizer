@@ -38,6 +38,8 @@ uniform vec2 uResolution;   // source pixel dims
 uniform vec3 uLightPos;     // (x, y, lightZ) — x/y in pixels rel. center, lightZ already *1000
 uniform vec3 uDiffuseColor;  uniform float uDiffuseIntensity;
 uniform vec3 uSpecularColor; uniform float uSpecularIntensity; uniform float uSpecularScatter;
+uniform sampler2D uSpecularMap;  // specular reflectivity map (grayscale)
+uniform int uHasSpecularMap;     // 0 = full reflectivity, 1 = sample uSpecularMap
 uniform vec3 uAmbientColor;  uniform float uAmbientIntensity;
 uniform int uToon;
 void main() {
@@ -56,7 +58,8 @@ void main() {
   vec3 R = reflect(-L, N);
   float spec = pow(max(0.0, R.z), uSpecularScatter);
   if (uToon == 1) spec = smoothstep(0.005, 0.01, spec);
-  vec3 specular = uSpecularIntensity * spec * uSpecularColor;
+  vec3 specMap = (uHasSpecularMap == 1) ? texture(uSpecularMap, vUV).rgb : vec3(1.0);
+  vec3 specular = uSpecularIntensity * spec * uSpecularColor * specMap;
   vec3 ambient = uAmbientColor * uAmbientIntensity;
   frag = vec4(tex.rgb * (diffuse + specular + ambient), tex.a);
 }`;
@@ -96,7 +99,8 @@ export function createLitGL(canvas) {
   for (const name of [
     "uCanvasSize", "uMode", "uTex", "uNormal", "uResolution", "uLightPos",
     "uDiffuseColor", "uDiffuseIntensity", "uSpecularColor", "uSpecularIntensity",
-    "uSpecularScatter", "uAmbientColor", "uAmbientIntensity", "uToon",
+    "uSpecularScatter", "uSpecularMap", "uHasSpecularMap",
+    "uAmbientColor", "uAmbientIntensity", "uToon",
   ]) {
     loc[name] = gl.getUniformLocation(prog, name);
   }
@@ -113,8 +117,8 @@ export function createLitGL(canvas) {
   gl.bindVertexArray(null);
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  const tex = { source: gl.createTexture(), normal: gl.createTexture() };
-  const ref = { source: null, normal: null };
+  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture() };
+  const ref = { source: null, normal: null, specular: null };
 
   // Upload (or re-upload) an ImageData into its slot only when the reference
   // changes; always (re)apply the min/mag filter — cheap, and `pixelated` can
@@ -158,13 +162,21 @@ export function createLitGL(canvas) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  function drawLit(source, normal, settings, toon, pixelated) {
+  function drawLit(source, normal, settings, toon, pixelated, specular = null) {
     upload("source", source, pixelated);
     upload("normal", normal, pixelated);
+    if (specular) upload("specular", specular, pixelated);
     bindUnit(0, tex.source);
     gl.uniform1i(loc.uTex, 0);
     bindUnit(1, tex.normal);
     gl.uniform1i(loc.uNormal, 1);
+    if (specular) {
+      bindUnit(2, tex.specular);
+      gl.uniform1i(loc.uSpecularMap, 2);
+      gl.uniform1i(loc.uHasSpecularMap, 1);
+    } else {
+      gl.uniform1i(loc.uHasSpecularMap, 0);
+    }
     gl.uniform1i(loc.uMode, 1);
     gl.uniform2f(loc.uResolution, source.width, source.height);
     gl.uniform3f(loc.uLightPos, settings.x, settings.y, settings.z * 1000);
@@ -185,7 +197,7 @@ export function createLitGL(canvas) {
    * `normal` is the active normal for the current pipeline (procedural or AI).
    */
   function draw(state) {
-    const { source, normal, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
+    const { source, normal, specular, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
     const ratio = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
     const cw = Math.max(320, Math.round(bounds.width * ratio));
@@ -203,8 +215,9 @@ export function createLitGL(canvas) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     if (!source) return null;
-    const needsNormal = mode !== "diffuse";
+    const needsNormal = mode !== "base" && mode !== "specular";
     if (needsNormal && !normal) return null; // overlay draws the AI placeholder
+    if (mode === "specular" && !specular) return null;
 
     const rect = fitRect(source.width, source.height, cw - 48, ch - 48);
     gl.useProgram(prog);
@@ -212,19 +225,21 @@ export function createLitGL(canvas) {
     gl.bindVertexArray(vao);
     setQuad(rect);
 
-    if (mode === "diffuse") {
+    if (mode === "base") {
       drawPassthrough("source", source, pixelated);
+    } else if (mode === "specular") {
+      drawPassthrough("specular", specular, pixelated);
     } else if (mode === "normal") {
       drawPassthrough("normal", normal, pixelated);
     } else if (mode === "lit") {
-      drawLit(source, normal, lightSettings, toon, pixelated);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular);
     } else {
       // split: diffuse underneath, lit over the right portion.
       drawPassthrough("source", source, pixelated);
       const splitPx = Math.round(rect.width * splitRatio);
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(rect.x + splitPx, ch - rect.y - rect.height, rect.width - splitPx, rect.height);
-      drawLit(source, normal, lightSettings, toon, pixelated);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular);
       gl.disable(gl.SCISSOR_TEST);
     }
 
@@ -245,21 +260,25 @@ export function createLitGL(canvas) {
       const H = 16;
       const sd = new Uint8ClampedArray(W * H * 4);
       const nd = new Uint8ClampedArray(W * H * 4);
+      const spd = new Uint8ClampedArray(W * H * 4);
       for (let i = 0; i < W * H; i += 1) {
         const o = i * 4;
         sd[o] = (i * 53) % 256; sd[o + 1] = (i * 97) % 256; sd[o + 2] = (i * 151) % 256; sd[o + 3] = 255;
         nd[o] = 128; nd[o + 1] = 200; nd[o + 2] = 160; nd[o + 3] = 255;
+        const v = (i * 37) % 256;
+        spd[o] = v; spd[o + 1] = v; spd[o + 2] = v; spd[o + 3] = 255;
       }
       const fixture = { width: W, height: H };
       const source = { ...fixture, data: sd };
       const normal = { ...fixture, data: nd };
+      const specular = { ...fixture, data: spd };
       const settings = {
         x: 3.2, y: -1.5, z: 0.66,
         diffuseColor: [0.2, 0.9, 0.6], diffuseIntensity: 0.7,
         specularColor: [0.3, 0.8, 0.5], specularIntensity: 0.5, specularScatter: 24,
         ambientColor: [0.9, 0.9, 0.95], ambientIntensity: 0.6,
       };
-      const cpu = buildLitPreview(source, normal, settings, false);
+      const cpu = buildLitPreview(source, normal, settings, false, specular);
 
       const off = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, off);
@@ -273,7 +292,7 @@ export function createLitGL(canvas) {
       gl.uniform2f(loc.uCanvasSize, W, H);
       gl.bindVertexArray(vao);
       setQuad({ x: 0, y: 0, width: W, height: H });
-      drawLit(source, normal, settings, false, false);
+      drawLit(source, normal, settings, false, false, specular);
 
       const gpu = new Uint8Array(W * H * 4);
       gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, gpu);
@@ -296,6 +315,7 @@ export function createLitGL(canvas) {
       // polluted the slot caches with the fixture).
       ref.source = null;
       ref.normal = null;
+      ref.specular = null;
       if (max > 3) {
         console.warn(`[litGL] shader/CPU parity delta = ${max} (expected ≤3 LSB)`);
       } else {
