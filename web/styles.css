@@ -222,6 +222,23 @@ button:hover,
   cursor: default;
 }
 
+/* Generate lives outside the tab panels so it's reachable from both the Light
+   and AI tabs; pin it to the bottom of the scrolling controls column. */
+.ai-generate-wrap {
+  position: sticky;
+  bottom: 0;
+  margin-top: 12px;
+  padding-top: 12px;
+  background: var(--surface);
+}
+
+.ai-generate-wrap .hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
 .control-panel .hint {
   color: var(--muted);
   font-size: 12px;

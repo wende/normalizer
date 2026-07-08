@@ -5,10 +5,10 @@
  * wrapper returns an ImageData for the canvas / lit preview.
  *
  * Order: decode -> optional smooth (blur the vector field) -> scale tangent XY
- * by `strength` -> optional axis inverts -> renormalize -> re-encode.
+ * by `strength` -> optional steps quantize -> renormalize -> re-encode.
  *   strength  1 = as generated, >1 = deeper/steeper relief, 0 = flat
  *   smooth    post blur radius in px (softens detail/noise)
- *   invertX/Y/Z  flip a channel (Invert Y = OpenGL <-> DirectX green flip)
+ *   steps     quantize the normal direction for flat facets (0 = off)
  */
 
 function clamp8(v) {
@@ -67,9 +67,6 @@ function boxBlur(src, W, H, r) {
 export function adjustNormalData(data, width, height, params = {}) {
   const strength = params.strength ?? 1;
   const smooth = Math.round(params.smooth ?? 0);
-  const invertX = !!params.invertX;
-  const invertY = !!params.invertY;
-  const invertZ = !!params.invertZ;
   const n = width * height;
 
   let nx = new Float32Array(n);
@@ -97,8 +94,6 @@ export function adjustNormalData(data, width, height, params = {}) {
   for (let i = 0, p = 0; i < n; i++, p += 4) {
     let x = nx[i] * strength;
     let y = ny[i] * strength;
-    if (invertX) x = -x;
-    if (invertY) y = -y;
     let z;
     if (quantize) {
       // Snap the tangent slope to discrete levels, then rebuild Z so every
@@ -114,10 +109,8 @@ export function adjustNormalData(data, width, height, params = {}) {
       } else {
         z = Math.sqrt(1 - t);
       }
-      if (invertZ) z = -z;
     } else {
       z = nz[i];
-      if (invertZ) z = -z;
       const len = Math.sqrt(x * x + y * y + z * z) || 1;
       x /= len;
       y /= len;
@@ -135,10 +128,7 @@ export function isIdentityAdjust(params = {}) {
   return (
     (params.strength ?? 1) === 1 &&
     !(Math.round(params.smooth ?? 0) > 0) &&
-    !(Math.round(params.steps ?? 0) >= 1) &&
-    !params.invertX &&
-    !params.invertY &&
-    !params.invertZ
+    !(Math.round(params.steps ?? 0) >= 1)
   );
 }
 

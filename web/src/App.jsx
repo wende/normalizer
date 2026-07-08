@@ -19,7 +19,7 @@ import {
 } from "./previewRender.js";
 import { adjustNormalMap } from "./normalAdjust.js";
 
-const SAMPLE_SRC = "./sample.png";
+const SAMPLE_SRC = "./demo.png";
 const LIGHT_SPRITE_SRC = "./laigter_texture.png";
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
 
@@ -43,7 +43,7 @@ export function App() {
   const aiWorker = useRef(null);
 
   // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
-  // tweaks (strength/smooth/invert) are applied on top to produce the AI normal.
+  // tweaks (strength/smooth/steps) are applied on top to produce the AI normal.
   // No re-inference — this recomputes instantly as the Adjust sliders move.
   const aiNormal = useMemo(() => {
     if (!aiOverlay) return null;
@@ -51,11 +51,8 @@ export function App() {
       strength: aiControls.strength / 100,
       smooth: aiControls.smooth,
       steps: aiControls.steps,
-      invertX: aiControls.invertX,
-      invertY: aiControls.invertY,
-      invertZ: aiControls.invertZ,
     });
-  }, [aiOverlay, aiControls.strength, aiControls.smooth, aiControls.steps, aiControls.invertX, aiControls.invertY, aiControls.invertZ]);
+  }, [aiOverlay, aiControls.strength, aiControls.smooth, aiControls.steps]);
 
   // The active normal depends entirely on the pipeline — the procedural and AI
   // maps are never mixed. Everything downstream (Lit/Split/Normal views, Export)

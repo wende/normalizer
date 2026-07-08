@@ -50,9 +50,6 @@ export const DEFAULT_AI_CONTROLS = {
   strength: 100, // % ; 100 = as generated, higher = deeper relief, 0 = flat
   smooth: 0, // post blur radius (px); 0 = off
   steps: 0, // normal-direction quantization for pixel-art facets; 0 = off
-  invertX: false,
-  invertY: false,
-  invertZ: false,
 };
 
 export const AI_STORAGE_KEY = "normalizer.ai";

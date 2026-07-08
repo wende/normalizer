@@ -255,20 +255,6 @@ export function ControlsPanel({
         data-control-tab="ai"
         hidden={!showAi}
       >
-        <button
-          id="aiGenerateButton"
-          class="ai-generate"
-          type="button"
-          onClick={onGenerateAI}
-          disabled={aiBusy}
-        >
-          {aiBusy ? "Generating…" : aiReady ? "Regenerate AI Normal" : "Generate AI Normal"}
-        </button>
-        <p class="hint">
-          DeepBump runs in your browser. The first run downloads the model
-          (~27&nbsp;MB, cached afterward).
-        </p>
-
         <div class="subsection-title">Adjust</div>
         <p class="hint">Applied live to the generated map — no regenerate needed.</p>
         <RangeRow
@@ -305,29 +291,6 @@ export function ControlsPanel({
           Steps quantizes the normal into flat facets for a pixel-art look
           (pairs well with higher Strength). Off = smooth gradient.
         </p>
-        <div class="toggles">
-          <ToggleRow
-            id="aiInvertX"
-            checked={aiControls.invertX}
-            onChange={(v) => onAiControlsChange({ invertX: v })}
-          >
-            Invert X
-          </ToggleRow>
-          <ToggleRow
-            id="aiInvertY"
-            checked={aiControls.invertY}
-            onChange={(v) => onAiControlsChange({ invertY: v })}
-          >
-            Invert Y (DirectX)
-          </ToggleRow>
-          <ToggleRow
-            id="aiInvertZ"
-            checked={aiControls.invertZ}
-            onChange={(v) => onAiControlsChange({ invertZ: v })}
-          >
-            Invert Z
-          </ToggleRow>
-        </div>
 
         <div class="subsection-title">Generation</div>
         <p class="hint">These change the model input — Regenerate to apply.</p>
@@ -357,6 +320,26 @@ export function ControlsPanel({
         </div>
         <p class="hint">Overlap: higher smooths tile seams (slower).</p>
       </div>
+
+      {/* Generate sits outside the tab panels so it's reachable from both the
+          Light and AI tabs of the AI pipeline. */}
+      {pipeline === "ai" && (
+        <div class="ai-generate-wrap">
+          <button
+            id="aiGenerateButton"
+            class="ai-generate"
+            type="button"
+            onClick={onGenerateAI}
+            disabled={aiBusy}
+          >
+            {aiBusy ? "Generating…" : aiReady ? "Regenerate AI Normal" : "Generate AI Normal"}
+          </button>
+          <p class="hint">
+            DeepBump runs in your browser. The first run downloads the model
+            (~27&nbsp;MB, cached afterward).
+          </p>
+        </div>
+      )}
     </aside>
   );
 }
