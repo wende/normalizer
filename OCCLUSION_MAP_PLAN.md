@@ -102,11 +102,30 @@ export function generateOcclusionMap(source, p, height = source) {
 ## CLI / Web / Preview / Tests
 
 - **CLI**: `occlusion` subcommand, USAGE, PNG round-trip; smoke case.
-- **Web**: `OcclusionPanel` with a distance-mode toggle that shows/hides the
-  distance slider; recompute wire-up in `App.jsx`; Occlusion preview tab; `_o`
-  export suffix.
-- **Preview**: raw-map tab first. Multiplying AO into the lit preview
-  (`shared/preview.js`) is optional polish, not required for this plan.
+- **Web**: fold occlusion into the existing Preact controls exactly the way
+  specular is wired — there are **no per-map panel components**, so mirror
+  specular across these files (`web/src/`):
+  - `controls.js` — `DEFAULT_OCCLUSION` + `buildOcclusionParams` (mirror
+    `DEFAULT_SPECULAR` / `buildSpecularParams`; do the UI→engine unit conversions
+    here, e.g. contrast ÷1000).
+  - `ControlsPanel.jsx` — add `occlusion` to the `TABS` map (in both the
+    `procedural` and `ai` arrays, like specular), a `const showOcclusion = tab
+    === "occlusion"` guard, and a `{showOcclusion && <div class="control-panel">
+    …}` block. The distance-mode toggle just conditionally renders the distance
+    `RangeRow`.
+  - `previewRender.js` — `generateOcclusion(source, params)` (mirror
+    `generateSpecular`), importing `generateOcclusionMap` from
+    `shared/occlusion.js`.
+  - `App.jsx` — `occlusionControls` state + `onOcclusionControlsChange` + a
+    40ms-debounced recompute `useEffect` (mirror the specular one), pass the
+    props into `<ControlsPanel>`, and add the `_o`/occlusion branch to the
+    Toolbar `onExport`.
+  - `PreviewTabBar.jsx` — add `{ id: "occlusion", label: "Occlusion" }` to
+    `MODES` for the raw-map preview tab.
+- **Preview**: the raw-map tab (above) is all this plan requires. Multiplying AO
+  into the lit preview is optional polish — and note the browser lit preview now
+  runs on the GPU (`web/src/litGL.js`), so it would mean feeding an AO texture
+  into that shader, not editing the CPU `shared/preview.js` path.
 - **Tests**: unit for the per-pixel math (flat mode, exact) and for
   `distanceTransform`; self-regression goldens covering distance-mode on/off,
   `occlusionDistance` at {0, mid, high}, invert on/off. Tolerance per §5.2.
@@ -118,7 +137,10 @@ export function generateOcclusionMap(source, p, height = source) {
 3. Unit test for flat-mode per-pixel pipeline.
 4. Blur via `gaussianBlur(...,3*blur)` (or §5.1 fast blur if janky).
 5. CLI `occlusion` subcommand + smoke.
-6. Web Occlusion panel (distance-mode toggle) + preview tab + `_o` export.
+6. Web wiring (mirror specular, no new panel component): `controls.js`
+   defaults/build fn, `ControlsPanel.jsx` occlusion block + `TABS` entry
+   (distance-mode toggle), `previewRender.js` generator, `App.jsx`
+   state/recompute/export, `PreviewTabBar.jsx` preview tab + `_o` export suffix.
 7. Self-regression goldens.
 
 ## Open decisions

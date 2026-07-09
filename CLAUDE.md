@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `normalizer` is a Laigter-derived normal/texture-map generator (GPL-3.0). Two implementations share one source of truth:
 
-- Browser UI (`web/`) — vanilla JS + Vite/Preact config, no build step for the modules it loads.
+- Browser UI (`web/`) — a Preact app in `web/src/` (JSX), served/built by Vite (`vite.config.js`; `make web`). It imports the `shared/` algorithms directly.
 - Node CLI (`cli/normalizer.js`) — uses `pngjs` for PNG I/O, ES modules.
 
 Both import pure-function algorithms from `shared/`. Upstream Laigter lives in `laigter/` as the porting reference and license root; the C++ rewrite (`core/`) is on the way out per `NORMALIZER_FEATURES.md`.
@@ -19,7 +19,7 @@ All commands are run from the repo root.
 |---|---|
 | Install JS deps | `make install` (or `npm install`) |
 | Build C++ core | `make` — produces `build/laigter-core-cli` |
-| Run web server (dev) | `make web` (port 8765) or `PORT=9000 make web` |
+| Run web server (dev) | `make web` (Vite, port 8765) or `WEB_PORT=9000 make web` |
 | Run smoke (C++ CLI) | `make smoke` |
 | Generate fixtures | `make fixtures` |
 | Run golden suite against current impl | `make current-goldens` (uses C++ CLI by default) |
@@ -30,7 +30,7 @@ All commands are run from the repo root.
 | Static file server (no API) | `make web-static` |
 | Clean build artifacts | `make clean` |
 
-The web server is static-only; it serves `web/`, `laigter/`, and `shared/`. No DB, no API endpoints, no native assets. AI generation runs entirely in the browser via `web/deepbump.worker.js`.
+`make web` runs the Vite dev server (JSX transform + HMR for `web/src/`), also serving `laigter/` and `shared/` from the repo root. There is no DB, no API endpoint, and no native asset — AI generation runs entirely in the browser via `web/deepbump.worker.js`. `make web-static` (or the standalone `web/server.js`) serves the same tree without Vite for a no-build/offline check, but won't transform JSX.
 
 ## Architecture
 
@@ -44,7 +44,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 
 ### Consumers
 
-- `web/app.js` — imports from `shared/` via relative paths. UI state lives in a plain object, debounced 40ms, recomputed on the main thread today (single worker is a planned hygiene step in `NORMALIZER_FEATURES.md` §2).
+- `web/src/` — Preact app (entry `main.jsx` → `App.jsx`). `previewRender.js` is the boundary that imports `shared/` and converts to/from `ImageData`. All controls live in one `ControlsPanel.jsx` — each map is a `{showX && …}` block gated by a `TABS` map (there are no per-map panel components), with matching preview `MODES` in `PreviewTabBar.jsx`. State is per-map React hooks in `App.jsx`; each map recomputes in a 40ms-debounced `useEffect` on the main thread today (single worker is a planned hygiene step in `NORMALIZER_FEATURES.md` §2).
 - `cli/normalizer.js` — mirrors the C++ CLI's argument/exit contract so `scripts/run_core_cases.py --cli` can swap either. Uses `pngjs` for I/O.
 
 ### C++ core (retiring)
@@ -60,9 +60,10 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 - `scripts/diff_pngs.py` — stdlib-only pixel diff using `scripts/golden_png.py` (no Pillow).
 - Per `NORMALIZER_FEATURES.md` §2, the harness will be repurposed to pin our own output (self-regression) once upstream parity is no longer the gate.
 
-### Web server (`web/server.js`)
+### Serving the web app
 
-- Serves `web/` statically; also serves `laigter/` and `shared/` from repo root (used by the browser to load upstream sample images and shared modules).
+- `make web` runs Vite (`vite.config.js`): it transforms the JSX under `web/src/`, serves `web/`, and also serves `laigter/` and `shared/` from the repo root (used to load upstream sample images and shared modules). Vite is the normal dev path.
+- `web/server.js` is a dependency-free static server for the same tree (no JSX transform); `make web-static` is the equivalent via `python3 -m http.server`. Both exist for no-build/offline checks.
 - The AI pipeline runs DeepBump via `web/deepbump.worker.js` in a Web Worker — no server endpoint is involved. The worker loads `onnxruntime-web` from a CDN, fetches and caches `deepbump256.onnx`, and runs tiled inference. See `web/README.md` for the controls and local-model fallback.
 
 ## Conventions
@@ -70,7 +71,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 - **License**: every file derived from Laigter must carry the GPL-3.0 derivation header (see top of `cli/normalizer.js`, `shared/normal.js`, `core/src/laigter_core.cpp`).
 - **Pure functions over typed arrays** in `shared/` — input params in, new buffer out. No mutation of caller data.
 - **No `ImageData` in `shared/`** — keeps it Node-loadable. Browser converts at the boundary.
-- **No bundler**: `shared/` is consumed by `<script type="module">` in `web/index.html` and by Node directly.
+- **No build step for `shared/`**: it stays plain ESM — imported by the Vite-built web app (through `web/src/previewRender.js`) and by Node (the CLI) directly. Only the web UI's JSX goes through Vite; `shared/` never does.
 - **Parameter names** come from the JS module (`DEFAULT_NORMAL_PARAMS`); CLI flag names match. C++ names differ (`normal_depth` vs `normalDepth`) — `scripts/run_core_cases.py` bridges the two.
 - **Tolerance defaults**: ±2 LSB max channel delta, 0 pixels over tolerance. Browser and CLI can differ by ±1 LSB on semi-transparent edges due to canvas premultiplication round-trips — adjust per-case tolerance if needed.
 
@@ -84,6 +85,6 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 ## Things to know before editing
 
 - The browser and CLI both load `shared/` modules directly. Editing `shared/normal.js` affects both; verify with `make js-smoke` after non-trivial changes.
-- `alphaDistance` is the most expensive primitive and is currently recomputed on every slider tick in `web/app.js`. Cache hooks are planned in `JS_CORE_MIGRATION.md` §5.8 but not yet wired.
+- `alphaDistance` is the most expensive primitive and is currently recomputed on every slider tick (the debounced recompute `useEffect`s in `web/src/App.jsx`). Cache hooks are planned in `JS_CORE_MIGRATION.md` §5.8 but not yet wired.
 - `gaussianBlur` diverges from CImg by a few LSB at borders / large sigma; this is accepted under "free to diverge" but documented in the function header.
 - The web server is static-only — no server-side dependency is required for the AI pipeline. To run offline, drop `deepbump256.onnx` next to `web/deepbump.worker.js` and point `DEFAULT_MODEL_URL` at it.

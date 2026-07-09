@@ -123,10 +123,16 @@ export function generateParallaxMap(source, p, height = source, bevelDistance = 
 - **CLI**: `parallax` subcommand with a `--parallax-type` switch that gates the
   Binary-only vs HeightMap-only flags; USAGE lists both groups; PNG round-trip;
   smoke case per type.
-- **Web**: `ParallaxPanel` with a type selector that swaps the visible controls
-  (Binary: max/min/focus/soft/erode-dilate/invert; HeightMap: max/brightness/
-  contrast/soft/invert). Recompute wire-up in `App.jsx`; Parallax preview tab;
-  `_p` export suffix. Contrast slider UI 1–4000 ÷1000.
+- **Web**: fold parallax into the existing Preact controls the way specular is
+  wired — there are **no per-map panel components**. Mirror specular across
+  `web/src/` (`controls.js` `DEFAULT_PARALLAX`/`buildParallaxParams`;
+  `ControlsPanel.jsx` `parallax` `TABS` entry + `showParallax` block;
+  `previewRender.js` `generateParallax`; `App.jsx` state/recompute/export;
+  `PreviewTabBar.jsx` `MODES` entry). The type selector is a radio group inside
+  the parallax block (reuse the `radio-group` pattern already used for bump
+  profile / AI overlap) that conditionally renders the visible controls — Binary:
+  max/min/focus/soft/erode-dilate/invert; HeightMap: max/brightness/contrast/
+  soft/invert. `_p` export suffix; contrast slider UI 1–4000 ÷1000.
 - **Preview**: raw-map tab. Live parallax-occlusion preview is a WebGL2 concern
   deferred in `NORMALIZER_FEATURES.md` §3 — a flat height preview is enough to
   tune the map.
@@ -144,7 +150,11 @@ export function generateParallaxMap(source, p, height = source, bevelDistance = 
 4. Resolve the §5.4 normalize decision in code + comment.
 5. Blur via `gaussianBlur(...,3*sigma)` (or §5.1 fast blur).
 6. CLI `parallax` subcommand (type-gated flags) + smoke per type.
-7. Web Parallax panel (type selector) + preview tab + `_p` export.
+7. Web wiring (mirror specular, no new panel component): `controls.js`
+   defaults/build fn, `ControlsPanel.jsx` parallax block + `TABS` entry (radio
+   type selector swapping the visible controls), `previewRender.js` generator,
+   `App.jsx` state/recompute/export, `PreviewTabBar.jsx` preview tab + `_p`
+   export.
 8. Self-regression goldens.
 
 ## Open decisions

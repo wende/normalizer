@@ -86,12 +86,24 @@ export function generateSpecularMap(source, p, specularBase = source) {
 
 ## Web UI
 
-- New `SpecularPanel` (follow `web/src/ControlsPanel.jsx` + `ControlCard.jsx`
-  patterns; contrast slider is UI 1–4000 mapped ÷1000, matching upstream).
-- Wire into the recompute path in `web/src/App.jsx`; add a Specular preview tab
-  (`web/src/PreviewTabBar.jsx`) showing the raw map.
-- Export: `_s` suffix (see `EXPORT` note below); coordinate with the shared
-  export-suffix work in `NORMALIZER_FEATURES.md` §1.5.
+There are **no per-map panel components** — a map is a conditional block inside
+the single `web/src/ControlsPanel.jsx`, gated by the `TABS` map. Wiring (this is
+how the shipped specular was done — the template for occlusion/parallax):
+
+- `controls.js` — `DEFAULT_SPECULAR` + `buildSpecularParams` (contrast slider is
+  UI 1–4000 mapped ÷1000, matching upstream; conversion lives here).
+- `ControlsPanel.jsx` — `specular` entry in `TABS`, a `showSpecular` guard, and a
+  `{showSpecular && <div class="control-panel">…}` block of `ControlCard`/
+  `RangeRow`/`ToggleRow`.
+- `previewRender.js` — `generateSpecular(source, params)` wrapping
+  `shared/specular.js`.
+- `App.jsx` — `specularControls` state + handler + 40ms-debounced recompute
+  `useEffect`; props passed into `<ControlsPanel>`.
+- `PreviewTabBar.jsx` — `{ id: "specular", label: "Specular" }` in `MODES` for
+  the raw-map preview tab.
+- Export: `_s` suffix via the Toolbar `onExport` branch (see `EXPORT` note
+  below); coordinate with the shared export-suffix work in
+  `NORMALIZER_FEATURES.md` §1.5.
 
 ## Tests
 
@@ -110,7 +122,10 @@ export function generateSpecularMap(source, p, specularBase = source) {
 3. Blur call: reuse `gaussianBlur(...,3*blur)`; if profiling janks at σ→50,
    pull in the §5.1 fast blur (shared with occlusion/parallax).
 4. CLI `specular` subcommand + USAGE + smoke.
-5. Web Specular panel + preview tab + `_s` export.
+5. Web wiring (no new panel component): `controls.js` defaults/build fn,
+   `ControlsPanel.jsx` specular block + `TABS` entry, `previewRender.js`
+   generator, `App.jsx` state/recompute, `PreviewTabBar.jsx` preview tab, `_s`
+   export.
 6. Self-regression goldens.
 
 ## Open decisions
