@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * normalizer CLI — normal- and specular-map generation.
+ * normalizer CLI — normal-, specular-, and occlusion-map generation.
  *
  * Derived from Laigter's GPL-3.0 logic; mirrors the argument/exit contract of
  * core/tools/laigter_core_cli.cpp so scripts/run_core_cases.py can drive either
@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import pngjs from "pngjs";
 import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
 import { generateSpecularMap, DEFAULT_SPECULAR_PARAMS } from "../shared/specular.js";
+import { generateOcclusionMap, DEFAULT_OCCLUSION_PARAMS } from "../shared/occlusion.js";
 
 const { PNG } = pngjs;
 
@@ -20,6 +21,7 @@ const USAGE = [
   "commands:",
   "  normal                           generate a tangent-space normal map",
   "  specular                         generate a specular reflectivity map",
+  "  occlusion                        generate an ambient-occlusion map",
   "",
   "normal options:",
   "  --normal-depth <int>             emboss strength (default 250)",
@@ -40,6 +42,16 @@ const USAGE = [
   "  --specular-blur <int>            blur sigma (default 3)",
   "  --specular-invert                invert the map",
   "  --use-specular-alpha             copy the source alpha into the output",
+  "",
+  "occlusion options:",
+  "  --occlusion-thresh <int>         threshold + contrast pivot (default 1)",
+  "  --occlusion-contrast <float>     contrast (default 1.0)",
+  "  --occlusion-bright <int>         brightness offset (default 16)",
+  "  --occlusion-blur <int>           blur sigma (default 3)",
+  "  --occlusion-distance-mode <0|1>  distance-transform AO (default 1)",
+  "  --occlusion-distance <int>       distance falloff scale (default 10)",
+  "  --occlusion-invert               invert the map",
+  "  --use-occlusion-alpha            copy the source alpha into the output",
 ].join("\n");
 
 function failUsage(message) {
@@ -149,6 +161,42 @@ function parseSpecularFlags(args) {
   return params;
 }
 
+function parseOcclusionFlags(args) {
+  const params = { ...DEFAULT_OCCLUSION_PARAMS };
+  for (let i = 3; i < args.length; i += 1) {
+    const arg = args[i];
+    switch (arg) {
+      case "--occlusion-thresh":
+        params.occlusionThresh = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-contrast":
+        params.occlusionContrast = parseFloatNumber(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-bright":
+        params.occlusionBright = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-blur":
+        params.occlusionBlur = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-distance-mode":
+        params.occlusionDistanceMode = parseInt32(requireValue(args, (i += 1), arg), arg) !== 0;
+        break;
+      case "--occlusion-distance":
+        params.occlusionDistance = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-invert":
+        params.occlusionInvert = true;
+        break;
+      case "--use-occlusion-alpha":
+        params.useAlpha = true;
+        break;
+      default:
+        fail(`unknown option: ${arg}`);
+    }
+  }
+  return params;
+}
+
 function parseArgs(args) {
   if (args.length === 0) {
     process.stdout.write(`${USAGE}\n`);
@@ -159,14 +207,19 @@ function parseArgs(args) {
     process.exit(0);
   }
   const command = args[0];
-  if (command !== "normal" && command !== "specular") {
+  const parsers = {
+    normal: parseNormalFlags,
+    specular: parseSpecularFlags,
+    occlusion: parseOcclusionFlags,
+  };
+  if (!(command in parsers)) {
     fail(`unknown command: ${command}`);
   }
   if (args.length < 3) {
     failUsage("missing input/output arguments");
   }
 
-  const params = command === "normal" ? parseNormalFlags(args) : parseSpecularFlags(args);
+  const params = parsers[command](args);
   return { command, inputPath: args[1], outputPath: args[2], params };
 }
 
@@ -183,7 +236,12 @@ const source = { width: inputPng.width, height: inputPng.height, data: inputPng.
 
 let out;
 try {
-  out = command === "normal" ? generateNormalMap(source, params) : generateSpecularMap(source, params);
+  const generators = {
+    normal: generateNormalMap,
+    specular: generateSpecularMap,
+    occlusion: generateOcclusionMap,
+  };
+  out = generators[command](source, params);
 } catch (error) {
   fail(error.message);
 }

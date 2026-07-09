@@ -6,6 +6,7 @@
 
 import { generateNormalMap } from "shared/normal.js";
 import { generateSpecularMap } from "shared/specular.js";
+import { generateOcclusionMap } from "shared/occlusion.js";
 import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "shared/preview.js";
 
 export function hexToRgb01(hex) {
@@ -135,6 +136,11 @@ export function generateSpecular(source, params) {
   return new ImageData(out.data, out.width, out.height);
 }
 
+export function generateOcclusion(source, params) {
+  const out = generateOcclusionMap(source, params);
+  return new ImageData(out.data, out.width, out.height);
+}
+
 export function renderLit(source, normal, lightSettings, toon, specular = null) {
   const out = buildLitPreview(source, normal, lightSettings, toon, specular);
   return new ImageData(out.data, out.width, out.height);
@@ -218,6 +224,7 @@ export function drawPreview({
   source,
   normal,
   specular,
+  occlusion,
   litCache,
   mode,
   pipeline,
@@ -243,10 +250,10 @@ export function drawPreview({
     return null;
   }
 
-  // Only the Base view renders without a generated map. Specular needs the
-  // specular map; Split/Lit/Normal need a normal map — and in the AI pipeline
+  // Only the Base view renders without a generated map. Specular/Occlusion need
+  // their own map; Split/Lit/Normal need a normal map — and in the AI pipeline
   // "no normal yet" means "not generated", so show a hint rather than a blank.
-  const needsNormal = mode !== "base" && mode !== "specular";
+  const needsNormal = mode !== "base" && mode !== "specular" && mode !== "occlusion";
   if (needsNormal && !normal) {
     if (pipeline === "ai") {
       drawAiPlaceholder(ctx, canvas);
@@ -256,12 +263,17 @@ export function drawPreview({
   if (mode === "specular" && !specular) {
     return null;
   }
+  if (mode === "occlusion" && !occlusion) {
+    return null;
+  }
 
   const rect = fitRect(source.width, source.height, canvas.width - 48, canvas.height - 48);
   if (mode === "base") {
     drawImageData(ctx, source, rect, pixelated);
   } else if (mode === "specular") {
     drawImageData(ctx, specular, rect, pixelated);
+  } else if (mode === "occlusion") {
+    drawImageData(ctx, occlusion, rect, pixelated);
   } else if (mode === "lit") {
     drawImageData(ctx, litCache || normal, rect, pixelated);
   } else if (mode === "normal") {

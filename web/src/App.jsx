@@ -9,8 +9,10 @@ import {
   DEFAULT_LIGHT_CONTROLS,
   DEFAULT_NORMAL,
   DEFAULT_SPECULAR,
+  DEFAULT_OCCLUSION,
   buildNormalParams,
   buildSpecularParams,
+  buildOcclusionParams,
 } from "./controls.js";
 import {
   buildLightSettings,
@@ -18,6 +20,7 @@ import {
   exportPng,
   generateNormal,
   generateSpecular,
+  generateOcclusion,
   readSourceFromImage,
   canvasToLight,
 } from "./previewRender.js";
@@ -31,6 +34,7 @@ export function App() {
   const [source, setSource] = useState(null);
   const [proceduralNormal, setProceduralNormal] = useState(null);
   const [specularMap, setSpecularMap] = useState(null);
+  const [occlusionMap, setOcclusionMap] = useState(null);
   const [aiOverlay, setAiOverlay] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [pipeline, setPipeline] = useState("procedural"); // "procedural" | "ai"
@@ -42,6 +46,7 @@ export function App() {
   const [light, setLight] = useState({ x: 0, y: 0 });
   const [normalControls, setNormalControls] = useState(DEFAULT_NORMAL);
   const [specularControls, setSpecularControls] = useState(DEFAULT_SPECULAR);
+  const [occlusionControls, setOcclusionControls] = useState(DEFAULT_OCCLUSION);
   const [lightControls, setLightControls] = useState(DEFAULT_LIGHT_CONTROLS);
   const [aiControls, setAiControls] = useState(DEFAULT_AI_CONTROLS);
   const lastRect = useRef(null);
@@ -49,6 +54,7 @@ export function App() {
   const lightSprite = useRef(null);
   const generateTimer = useRef(0);
   const specularTimer = useRef(0);
+  const occlusionTimer = useRef(0);
   const aiWorker = useRef(null);
 
   // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
@@ -81,6 +87,9 @@ export function App() {
   }, []);
   const onSpecularControlsChange = useCallback((patch) => {
     setSpecularControls((prev) => ({ ...prev, ...patch }));
+  }, []);
+  const onOcclusionControlsChange = useCallback((patch) => {
+    setOcclusionControls((prev) => ({ ...prev, ...patch }));
   }, []);
   const onLightControlsChange = useCallback((patch) => {
     setLightControls((prev) => ({ ...prev, ...patch }));
@@ -180,12 +189,24 @@ export function App() {
     return () => clearTimeout(specularTimer.current);
   }, [source, specularControls]);
 
+  // Occlusion map — recomputed (debounced) from the source + occlusion sliders.
+  useEffect(() => {
+    if (!source) return;
+    clearTimeout(occlusionTimer.current);
+    occlusionTimer.current = setTimeout(() => {
+      const params = buildOcclusionParams(occlusionControls);
+      setOcclusionMap(generateOcclusion(source, params));
+    }, 40);
+    return () => clearTimeout(occlusionTimer.current);
+  }, [source, occlusionControls]);
+
   // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
   // only update a shader uniform, so no ImageData is rebuilt per drag here.
   const drawArgs = useMemo(() => ({
     source,
     normal: activeNormal,
     specular: specularMap,
+    occlusion: occlusionMap,
     mode,
     pipeline,
     light,
@@ -199,7 +220,7 @@ export function App() {
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
     onSplitDragChange: setDraggingSplit,
-  }), [source, activeNormal, specularMap, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
+  }), [source, activeNormal, specularMap, occlusionMap, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
 
   const onSplitRatioChange = useCallback((next) => {
     setSplitRatio((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
@@ -255,11 +276,11 @@ export function App() {
       <Toolbar
         onOpenFile={onOpenFile}
         onLoadSample={loadSample}
-        onExport={() => (
-          mode === "specular"
-            ? exportPng(specularMap, "laigter-specular.png")
-            : exportPng(activeNormal, "laigter-normal.png")
-        )}
+        onExport={() => {
+          if (mode === "specular") return exportPng(specularMap, "laigter-specular.png");
+          if (mode === "occlusion") return exportPng(occlusionMap, "laigter-occlusion.png");
+          return exportPng(activeNormal, "laigter-normal.png");
+        }}
       />
       <PreviewTabBar
         mode={mode}
@@ -284,6 +305,8 @@ export function App() {
           onNormalControlsChange={onNormalControlsChange}
           specularControls={specularControls}
           onSpecularControlsChange={onSpecularControlsChange}
+          occlusionControls={occlusionControls}
+          onOcclusionControlsChange={onOcclusionControlsChange}
           lightControls={lightControls}
           onLightControlsChange={onLightControlsChange}
           aiControls={aiControls}

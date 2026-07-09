@@ -48,29 +48,19 @@ export function edt1d(f, n) {
 }
 
 /**
- * Two-pass Euclidean distance transform of an RGBA image's alpha mask. Interior
- * opaque pixels are seeded with +inf, edges/transparent pixels with 0. Returns
- * a Float32Array (width*height) of Euclidean distances (sqrt applied).
+ * Two-pass Euclidean distance transform of a 0/+inf grid (the Felzenszwalb
+ * per-axis pass applied along columns then rows, with the final sqrt). `mask`
+ * is a Float32Array of length width*height seeded with 0 at background pixels
+ * and a large value (e.g. 1e20) at object pixels; the result is the Euclidean
+ * distance from each pixel to the nearest background pixel. The same operation
+ * CImg's .distance(0) performs.
  */
-export function alphaDistance(image) {
-  const width = image.width;
-  const height = image.height;
-  const inf = 1e20;
-  const grid = new Float32Array(width * height);
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const i = y * width + x;
-      const a = image.data[rgbaOffset(width, x, y) + 3];
-      grid[i] = a > 0 && x > 0 && y > 0 && x < width - 1 && y < height - 1 ? inf : 0;
-    }
-  }
-
+export function distanceTransform(mask, width, height) {
   const temp = new Float32Array(width * height);
   const column = new Float32Array(height);
   for (let x = 0; x < width; x += 1) {
     for (let y = 0; y < height; y += 1) {
-      column[y] = grid[y * width + x];
+      column[y] = mask[y * width + x];
     }
     const d = edt1d(column, height);
     for (let y = 0; y < height; y += 1) {
@@ -91,6 +81,28 @@ export function alphaDistance(image) {
   }
 
   return out;
+}
+
+/**
+ * Two-pass Euclidean distance transform of an RGBA image's alpha mask. Interior
+ * opaque pixels are seeded with +inf, edges/transparent pixels with 0. Returns
+ * a Float32Array (width*height) of Euclidean distances (sqrt applied).
+ */
+export function alphaDistance(image) {
+  const width = image.width;
+  const height = image.height;
+  const inf = 1e20;
+  const grid = new Float32Array(width * height);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = y * width + x;
+      const a = image.data[rgbaOffset(width, x, y) + 3];
+      grid[i] = a > 0 && x > 0 && y > 0 && x < width - 1 && y < height - 1 ? inf : 0;
+    }
+  }
+
+  return distanceTransform(grid, width, height);
 }
 
 /**
