@@ -4,6 +4,9 @@ laigter/translations/*.qm
 tests/fixtures/inputs/generated/
 tests/golden/current/
 
+# OS / editor
+.DS_Store
+
 # Python
 __pycache__/
 *.pyc
@@ -13,3 +16,13 @@ __pycache__/
 node_modules/
 tests/golden/node/
 tests/golden/node-rerun/
+
+# Test artifacts
+test-results/
+
+# Experiment scratch (keep code, ignore transient images)
+experiments/**/*.png
+!experiments/**/*.py
+!experiments/**/*.md
+!experiments/**/*.txt
+!experiments/**/*.onnx
