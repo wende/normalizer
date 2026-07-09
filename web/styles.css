@@ -98,7 +98,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Full-page app shell */
 .app {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-rows: auto auto 1fr;
   background: var(--shell-bg);
@@ -242,6 +242,9 @@ button:hover,
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+  /* Pin the row to the fixed workspace height so a tall sidebar (which scrolls
+     via its own overflow:auto) never stretches the preview canvas. */
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .preview-area {

@@ -4,7 +4,17 @@
 // blur off (radius 0 no-ops) so the math is exact.
 
 import { strict as assert } from "node:assert";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import pngjs from "pngjs";
 import { generateSpecularMap, DEFAULT_SPECULAR_PARAMS } from "../shared/specular.js";
+import { gaussianBlur } from "../shared/primitives.js";
+
+const { PNG } = pngjs;
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 // 2x2 RGBA fixture. grayscaleFromRgba uses qGray (11r+16g+5b)/32, transparent→0:
 //   px0 white opaque         → gray 255
@@ -79,6 +89,65 @@ console.log("specular per-pixel pipeline (blur off)");
   check("useAlpha px0 a=255", px(m, 0)[3], 255);
   check("useAlpha px2 a=128", px(m, 2)[3], 128);
   check("useAlpha px3 a=0", px(m, 3)[3], 0);
+}
+
+// 6. blur path pins the sigma convention. gaussianBlur takes a radius and derives
+//    sigma = radius/3; upstream passes specularBlur straight in as sigma, so
+//    generateSpecularMap must call it with 3*specularBlur. Compare the blurred
+//    output against a direct gaussianBlur(field, w, h, 3*blur) — if the 3x
+//    multiplier ever drifts, the two diverge and this fails.
+{
+  const blur = 2;
+  // per-pixel value at contrast 1 / thresh 127 / bright 0 is just the gray:
+  // row-major [px0, px1, px2, px3] = [255, 0, 140, 0].
+  const grayField = Float32Array.of(255, 0, 140, 0);
+  const expectedFloat = gaussianBlur(grayField, source.width, source.height, 3 * blur);
+  // Uint8ClampedArray rounds ties-to-even; assign through one to match exactly.
+  const expected = new Uint8ClampedArray(4);
+  for (let i = 0; i < 4; i += 1) expected[i] = expectedFloat[i];
+
+  const m = generateSpecularMap(source, { ...DEFAULT_SPECULAR_PARAMS, specularBlur: blur });
+  for (let i = 0; i < 4; i += 1) {
+    check(`blur px${i} = gaussianBlur(..., 3*blur)`, px(m, i), [expected[i], expected[i], expected[i], 255]);
+  }
+}
+
+// 7. CLI wiring end-to-end: `normalizer specular` reads a PNG, runs the pipeline,
+//    and writes an 8-bit RGBA PNG. Blur off + contrast 1 keeps the math exact so
+//    the output equals the per-pixel grayscale. Guards the arg parsing + I/O path
+//    that the pure-function tests above don't touch.
+{
+  const dir = mkdtempSync(join(tmpdir(), "spec-cli-"));
+  try {
+    const inPath = join(dir, "in.png");
+    const outPath = join(dir, "out.png");
+
+    // 2x2 opaque: white / black / mid-gray / quarter-gray → qGray = 255, 0, 128, 64.
+    const inPng = new PNG({ width: 2, height: 2 });
+    inPng.data.set(Uint8Array.of(
+      255, 255, 255, 255,
+      0, 0, 0, 255,
+      128, 128, 128, 255,
+      64, 64, 64, 255,
+    ));
+    writeFileSync(inPath, PNG.sync.write(inPng));
+
+    const stdout = execFileSync(
+      process.execPath,
+      [join(HERE, "..", "cli", "normalizer.js"), "specular", inPath, outPath, "--specular-blur", "0", "--specular-contrast", "1"],
+      { encoding: "utf8" },
+    );
+    check("cli reports the specular write", stdout.includes("wrote specular map"), true);
+
+    const outPng = PNG.sync.read(readFileSync(outPath));
+    const want = [255, 0, 128, 64];
+    for (let i = 0; i < 4; i += 1) {
+      const o = i * 4;
+      check(`cli out px${i}`, [outPng.data[o], outPng.data[o + 1], outPng.data[o + 2], outPng.data[o + 3]], [want[i], want[i], want[i], 255]);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 console.log(`\nall ${passed} checks passed`);

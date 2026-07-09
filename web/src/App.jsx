@@ -90,7 +90,7 @@ export function App() {
   }, []);
 
   // Switch pipeline, keeping the controls tab valid for the new pipeline
-  // (Normal <-> AI are pipeline-specific; Light is shared).
+  // (Normal <-> AI are pipeline-specific; Light and Specular are shared).
   const onPipelineChange = useCallback((next) => {
     setPipeline(next);
     setTab((prev) => {

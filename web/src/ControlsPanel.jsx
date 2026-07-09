@@ -18,6 +18,7 @@ const TABS = {
   ai: [
     { id: "light", label: "Light" },
     { id: "ai", label: "AI" },
+    { id: "specular", label: "Specular" },
   ],
 };
 
@@ -46,7 +47,9 @@ export function ControlsPanel({
 }) {
   const tabs = TABS[pipeline] || TABS.procedural;
   const showNormal = pipeline === "procedural" && tab === "normal";
-  const showSpecular = pipeline === "procedural" && tab === "specular";
+  // Specular applies to both pipelines — the map modulates the lit preview
+  // regardless of how the normal was produced, so its sliders live in both tabs.
+  const showSpecular = tab === "specular";
   const showAi = pipeline === "ai" && tab === "ai";
 
   return (

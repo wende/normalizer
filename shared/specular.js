@@ -34,6 +34,12 @@ export const DEFAULT_SPECULAR_PARAMS = {
 export function generateSpecularMap(source, p, specularBase = source) {
   const width = source.width;
   const height = source.height;
+  // Intentional divergence from upstream: Laigter converts SpecularBase via
+  // QImage::Format_Grayscale8, which keeps RGB luminance and ignores alpha, so a
+  // transparent-but-colored pixel reads as its luminance. grayscaleFromRgba
+  // instead zeros fully-transparent pixels (→ 0 reflectivity). We prefer the
+  // latter (transparent regions shouldn't reflect) per the self-regression
+  // direction in NORMALIZER_FEATURES.md — do not "restore parity" here.
   const gray = grayscaleFromRgba(specularBase);
   const contrast = p.specularContrast;
   const pivot = p.specularThresh * (1 - contrast);
