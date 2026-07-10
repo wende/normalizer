@@ -2,10 +2,13 @@ import { useEffect, useRef } from "preact/hooks";
 import {
   canvasPointFromEvent,
   canvasToSplitRatio,
+  canvasToShadowContact,
   drawAiPlaceholder,
   drawLightHandle,
+  drawShadowContactHandle,
   drawPreview,
   pointHitsLight,
+  pointHitsShadowContact,
   pointHitsSplitDivider,
   renderLit,
   splitDividerX,
@@ -39,12 +42,15 @@ function drawOverlay(octx, canvas, drawArgs, rect) {
     drawSplitDivider(octx, rect, drawArgs.splitRatio ?? 0.5, drawArgs.draggingSplit);
   }
   drawLightHandle(octx, drawArgs.light, drawArgs.source, rect, drawArgs.draggingLight, drawArgs.lightSprite);
+  if (drawArgs.mode === "lit") {
+    drawShadowContactHandle(octx, drawArgs.shadow, drawArgs.source, rect);
+  }
 }
 
 function cpuFallback(overlay, octx, drawArgs) {
   const {
     source, normal, specular, mode, pipeline, light, pixelated, draggingLight, lightSprite,
-    lightSettings, toon, splitRatio,
+    lightSettings, toon, splitRatio, shadow,
   } = drawArgs;
   const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular) : null;
   return drawPreview({
@@ -57,6 +63,8 @@ function cpuFallback(overlay, octx, drawArgs) {
     mode,
     pipeline,
     light,
+    lightSettings,
+    shadow,
     pixelated,
     draggingLight,
     lightSprite,
@@ -78,6 +86,7 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
       source: drawArgs.source,
       normal: drawArgs.normal,
       specular: drawArgs.specular,
+      shadow: drawArgs.shadow,
       mode: drawArgs.mode,
       lightSettings: drawArgs.lightSettings,
       toon: drawArgs.toon,
@@ -93,17 +102,23 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
     rect = cpuFallback(overlay, octx, drawArgs);
   }
   drawArgs.onRectChange(rect);
-  if (stageEl && rect && glCanvas.width > 0) {
-    stageEl.dataset.imageLeft = String(rect.x / glCanvas.width);
-    stageEl.dataset.imageWidth = String(rect.width / glCanvas.width);
-    stageEl.dataset.imageTop = String(rect.y / glCanvas.height);
-    stageEl.dataset.imageHeight = String(rect.height / glCanvas.height);
+  const renderedCanvas = gl ? glCanvas : overlay;
+  if (stageEl && rect && renderedCanvas.width > 0) {
+    stageEl.dataset.imageLeft = String(rect.x / renderedCanvas.width);
+    stageEl.dataset.imageWidth = String(rect.width / renderedCanvas.width);
+    stageEl.dataset.imageTop = String(rect.y / renderedCanvas.height);
+    stageEl.dataset.imageHeight = String(rect.height / renderedCanvas.height);
+    if (drawArgs.shadow?.contact) {
+      stageEl.dataset.shadowContactX = String(drawArgs.shadow.contact.x);
+      stageEl.dataset.shadowContactY = String(drawArgs.shadow.contact.y);
+    }
   }
 }
 
 export function PreviewArea({
   drawArgs,
   onLightMove,
+  onShadowContactMove,
   onSplitRatioChange,
   splitRatio,
   lightSprite,
@@ -140,6 +155,10 @@ export function PreviewArea({
       canvas.style.cursor = "col-resize";
       return;
     }
+    if (drawArgs.mode === "lit" && pointHitsShadowContact(point, drawArgs.shadow, source, rect)) {
+      canvas.style.cursor = "grab";
+      return;
+    }
     canvas.style.cursor = pointHitsLight(point, drawArgs.light, source, rect) ? "grab" : "";
   };
 
@@ -156,6 +175,14 @@ export function PreviewArea({
       canvasRef.current.style.cursor = "col-resize";
       drawArgs.onSplitDragChange(true);
       onSplitRatioChange(canvasToSplitRatio(point, rect));
+      return;
+    }
+
+    if (drawArgs.mode === "lit" && pointHitsShadowContact(point, drawArgs.shadow, source, rect)) {
+      e.preventDefault();
+      dragState.current = { kind: "shadow-contact", pointerId: e.pointerId };
+      canvasRef.current.setPointerCapture(e.pointerId);
+      canvasRef.current.style.cursor = "grabbing";
       return;
     }
 
@@ -178,6 +205,12 @@ export function PreviewArea({
     if (dragState.current.kind === "light") {
       e.preventDefault();
       onLightMove(point);
+      return;
+    }
+    if (dragState.current.kind === "shadow-contact") {
+      e.preventDefault();
+      const rect = lastRectRef.current;
+      if (rect) onShadowContactMove(canvasToShadowContact(point, rect));
       return;
     }
     updateCursor(point);

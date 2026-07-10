@@ -29,6 +29,10 @@ export const DEFAULT_LIGHT_CONTROLS = {
   ambientColor: "#ffffff",
   lightColor: "#00ffb3",
   lightHeight: 30,
+  shadowEnabled: true,
+  shadowCasterHeight: 35,
+  shadowOpacity: 45,
+  shadowSoftness: 4,
 };
 
 // Controls for the in-browser DeepBump pipeline (AI tab). `overlap` is the one
