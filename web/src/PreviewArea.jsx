@@ -30,7 +30,7 @@ function drawSplitDivider(octx, rect, splitRatio, dragging) {
 function drawOverlay(octx, canvas, drawArgs, rect) {
   octx.clearRect(0, 0, canvas.width, canvas.height);
   if (!rect) {
-    if (drawArgs.mode !== "base" && drawArgs.mode !== "specular" && drawArgs.pipeline === "ai") {
+    if (drawArgs.mode !== "base" && drawArgs.mode !== "specular" && drawArgs.mode !== "parallax" && drawArgs.pipeline === "ai") {
       drawAiPlaceholder(octx, canvas);
     }
     return;
@@ -43,7 +43,7 @@ function drawOverlay(octx, canvas, drawArgs, rect) {
 
 function cpuFallback(overlay, octx, drawArgs) {
   const {
-    source, normal, specular, mode, pipeline, light, pixelated, draggingLight, lightSprite,
+    source, normal, specular, parallax, mode, pipeline, light, pixelated, draggingLight, lightSprite,
     lightSettings, toon, splitRatio,
   } = drawArgs;
   const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular) : null;
@@ -53,6 +53,7 @@ function cpuFallback(overlay, octx, drawArgs) {
     source,
     normal,
     specular,
+    parallax,
     litCache,
     mode,
     pipeline,
@@ -78,6 +79,7 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
       source: drawArgs.source,
       normal: drawArgs.normal,
       specular: drawArgs.specular,
+      parallax: drawArgs.parallax,
       mode: drawArgs.mode,
       lightSettings: drawArgs.lightSettings,
       toon: drawArgs.toon,

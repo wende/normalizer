@@ -117,8 +117,8 @@ export function createLitGL(canvas) {
   gl.bindVertexArray(null);
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture() };
-  const ref = { source: null, normal: null, specular: null };
+  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture(), parallax: gl.createTexture() };
+  const ref = { source: null, normal: null, specular: null, parallax: null };
 
   // Upload (or re-upload) an ImageData into its slot only when the reference
   // changes; always (re)apply the min/mag filter — cheap, and `pixelated` can
@@ -197,7 +197,7 @@ export function createLitGL(canvas) {
    * `normal` is the active normal for the current pipeline (procedural or AI).
    */
   function draw(state) {
-    const { source, normal, specular, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
+    const { source, normal, specular, parallax, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
     const ratio = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
     const cw = Math.max(320, Math.round(bounds.width * ratio));
@@ -215,9 +215,10 @@ export function createLitGL(canvas) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     if (!source) return null;
-    const needsNormal = mode !== "base" && mode !== "specular";
+    const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax";
     if (needsNormal && !normal) return null; // overlay draws the AI placeholder
     if (mode === "specular" && !specular) return null;
+    if (mode === "parallax" && !parallax) return null;
 
     const rect = fitRect(source.width, source.height, cw - 48, ch - 48);
     gl.useProgram(prog);
@@ -229,6 +230,8 @@ export function createLitGL(canvas) {
       drawPassthrough("source", source, pixelated);
     } else if (mode === "specular") {
       drawPassthrough("specular", specular, pixelated);
+    } else if (mode === "parallax") {
+      drawPassthrough("parallax", parallax, pixelated);
     } else if (mode === "normal") {
       drawPassthrough("normal", normal, pixelated);
     } else if (mode === "lit") {
@@ -316,6 +319,7 @@ export function createLitGL(canvas) {
       ref.source = null;
       ref.normal = null;
       ref.specular = null;
+      ref.parallax = null;
       if (max > 3) {
         console.warn(`[litGL] shader/CPU parity delta = ${max} (expected ≤3 LSB)`);
       } else {

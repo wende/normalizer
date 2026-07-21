@@ -150,3 +150,74 @@ export function smoothstep(edge0, edge1, value) {
   const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
 }
+
+/**
+ * Separable 1D morphological filter (van Herk / Gil–Werman), O(1)/px for a
+ * window of radius r. `op` is Math.max (dilate) or Math.min (erode). Borders
+ * are replicate-padded. Returns a new Float32Array of length L.
+ *
+ * Block-aligned forward (fwd) and backward (bwd) running op: any radius-r
+ * window [i, i+2r] is covered by bwd[i] (i→block end) ∪ fwd[i+2r] (block
+ * start→i+2r). See JS_CORE_MIGRATION.md §5.3.
+ */
+function morph1D(src, L, r, op) {
+  if (r <= 0) return new Float32Array(src);
+  const w = 2 * r + 1;
+  const N = L + 2 * r;
+  const pad = new Float32Array(N);
+  for (let i = 0; i < r; i += 1) pad[i] = src[0];
+  pad.set(src, r);
+  for (let i = 0; i < r; i += 1) pad[L + r + i] = src[L - 1];
+
+  const fwd = new Float32Array(N);
+  const bwd = new Float32Array(N);
+  for (let i = 0; i < N; i += 1) {
+    fwd[i] = i % w === 0 ? pad[i] : op(fwd[i - 1], pad[i]);
+  }
+  for (let i = N - 1; i >= 0; i -= 1) {
+    // The trailing block is partial when N is not a multiple of w; reset there too.
+    bwd[i] = i === N - 1 || (i + 1) % w === 0 ? pad[i] : op(bwd[i + 1], pad[i]);
+  }
+
+  const out = new Float32Array(L);
+  for (let i = 0; i < L; i += 1) {
+    out[i] = op(bwd[i], fwd[i + 2 * r]);
+  }
+  return out;
+}
+
+/**
+ * Separable n×n morphological filter along both axes. `n` is the full element
+ * width; n ≤ 1 is a no-op (returns a copy). CImg counts the size the same way,
+ * so dilate(buf,w,h,1) is identity. `op` is Math.max or Math.min.
+ */
+function morph(buf, w, h, n, op) {
+  if (n <= 1) return new Float32Array(buf);
+  const r = n >> 1;
+  const tmp = new Float32Array(w * h);
+  const row = new Float32Array(w);
+  for (let y = 0; y < h; y += 1) {
+    const base = y * w;
+    for (let x = 0; x < w; x += 1) row[x] = buf[base + x];
+    const filtered = morph1D(row, w, r, op);
+    for (let x = 0; x < w; x += 1) tmp[base + x] = filtered[x];
+  }
+  const out = new Float32Array(w * h);
+  const col = new Float32Array(h);
+  for (let x = 0; x < w; x += 1) {
+    for (let y = 0; y < h; y += 1) col[y] = tmp[y * w + x];
+    const filtered = morph1D(col, h, r, op);
+    for (let y = 0; y < h; y += 1) out[y * w + x] = filtered[y];
+  }
+  return out;
+}
+
+/** n×n rectangular dilation (max filter); n ≤ 1 is a no-op. */
+export function dilate(buf, w, h, n) {
+  return morph(buf, w, h, n, Math.max);
+}
+
+/** n×n rectangular erosion (min filter); n ≤ 1 is a no-op. */
+export function erode(buf, w, h, n) {
+  return morph(buf, w, h, n, Math.min);
+}

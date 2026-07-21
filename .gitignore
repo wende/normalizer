@@ -26,3 +26,7 @@ experiments/**/*.png
 !experiments/**/*.md
 !experiments/**/*.txt
 !experiments/**/*.onnx
+
+# build output & transient tool logs
+web/dist/
+.playwright-cli/

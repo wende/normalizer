@@ -2,7 +2,7 @@ import { RangeRow } from "./RangeRow.jsx";
 import { ToggleRow, ColorRow } from "./ToggleRow.jsx";
 import { ControlCard } from "./ControlCard.jsx";
 import { PillSwitch } from "./PillSwitch.jsx";
-import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL, DEFAULT_SPECULAR } from "./controls.js";
+import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL, DEFAULT_SPECULAR, DEFAULT_PARALLAX } from "./controls.js";
 
 const PIPELINES = [
   { id: "procedural", label: "Procedural" },
@@ -14,11 +14,13 @@ const TABS = {
     { id: "light", label: "Light" },
     { id: "normal", label: "Normal" },
     { id: "specular", label: "Specular" },
+    { id: "parallax", label: "Parallax" },
   ],
   ai: [
     { id: "light", label: "Light" },
     { id: "ai", label: "AI" },
     { id: "specular", label: "Specular" },
+    { id: "parallax", label: "Parallax" },
   ],
 };
 
@@ -37,6 +39,8 @@ export function ControlsPanel({
   onNormalControlsChange,
   specularControls,
   onSpecularControlsChange,
+  parallaxControls,
+  onParallaxControlsChange,
   lightControls,
   onLightControlsChange,
   aiControls,
@@ -47,10 +51,12 @@ export function ControlsPanel({
 }) {
   const tabs = TABS[pipeline] || TABS.procedural;
   const showNormal = pipeline === "procedural" && tab === "normal";
-  // Specular applies to both pipelines — the map modulates the lit preview
-  // regardless of how the normal was produced, so its sliders live in both tabs.
+  // Specular/Parallax apply to both pipelines — these raw maps don't depend on
+  // how the normal was produced, so their sliders live in both tabs.
   const showSpecular = tab === "specular";
+  const showParallax = tab === "parallax";
   const showAi = pipeline === "ai" && tab === "ai";
+  const parallaxIsBinary = parallaxControls.parallaxType !== "heightmap";
 
   return (
     <aside class="controls" aria-label="Controls">
@@ -315,6 +321,131 @@ export function ControlsPanel({
       </div>
       )}
 
+      {showParallax && (
+      <div
+        class="control-panel active"
+        id="parallaxPanel"
+        role="tabpanel"
+        data-control-tab="parallax"
+      >
+        <ControlCard title="Type">
+          <div class="radio-group" role="radiogroup" aria-label="Parallax type">
+            <label>
+              <input
+                type="radio"
+                name="parallaxType"
+                value="binary"
+                checked={parallaxIsBinary}
+                onChange={() => onParallaxControlsChange({ parallaxType: "binary" })}
+              />
+              {" "}Binary
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="parallaxType"
+                value="heightmap"
+                checked={!parallaxIsBinary}
+                onChange={() => onParallaxControlsChange({ parallaxType: "heightmap" })}
+              />
+              {" "}HeightMap
+            </label>
+          </div>
+        </ControlCard>
+
+        <ControlCard title="Tone">
+          <RangeRow
+            label={parallaxIsBinary ? "Threshold" : "Pivot"}
+            id="parallaxMax"
+            min={0}
+            max={255}
+            value={parallaxControls.parallaxMax}
+            onChange={(v) => onParallaxControlsChange({ parallaxMax: v })}
+          />
+          {parallaxIsBinary && (
+            <RangeRow
+              label="Floor"
+              id="parallaxMin"
+              min={0}
+              max={255}
+              value={parallaxControls.parallaxMin}
+              onChange={(v) => onParallaxControlsChange({ parallaxMin: v })}
+            />
+          )}
+          {parallaxIsBinary && (
+            <RangeRow
+              label="Focus"
+              id="parallaxFocus"
+              min={0}
+              max={50}
+              value={parallaxControls.parallaxFocus}
+              onChange={(v) => onParallaxControlsChange({ parallaxFocus: v })}
+            />
+          )}
+          {parallaxIsBinary && (
+            <RangeRow
+              label="Erode/Dilate"
+              id="parallaxErodeDilate"
+              min={-99}
+              max={99}
+              value={parallaxControls.parallaxErodeDilate}
+              onChange={(v) => onParallaxControlsChange({ parallaxErodeDilate: v })}
+              format={(v) => (v > 0 ? `Dilate ${v}` : v < 0 ? `Erode ${-v}` : "Off")}
+            />
+          )}
+          {!parallaxIsBinary && (
+            <RangeRow
+              label="Brightness"
+              id="parallaxBrightness"
+              min={-255}
+              max={255}
+              value={parallaxControls.parallaxBrightness}
+              onChange={(v) => onParallaxControlsChange({ parallaxBrightness: v })}
+            />
+          )}
+          {!parallaxIsBinary && (
+            <RangeRow
+              label="Contrast"
+              id="parallaxContrast"
+              min={1}
+              max={4000}
+              step={1}
+              value={parallaxControls.parallaxContrast}
+              onChange={(v) => onParallaxControlsChange({ parallaxContrast: v })}
+              format={(v) => (v / 1000).toFixed(3)}
+            />
+          )}
+          <RangeRow
+            label="Soft"
+            id="parallaxSoft"
+            min={0}
+            max={50}
+            value={parallaxControls.parallaxSoft}
+            onChange={(v) => onParallaxControlsChange({ parallaxSoft: v })}
+          />
+        </ControlCard>
+
+        <ControlCard title="Options">
+          <div class="toggles">
+            <ToggleRow
+              id="parallaxInvert"
+              checked={parallaxControls.parallaxInvert}
+              onChange={(v) => onParallaxControlsChange({ parallaxInvert: v })}
+            >
+              Invert
+            </ToggleRow>
+            <ToggleRow
+              id="parallaxUseAlpha"
+              checked={parallaxControls.useAlpha}
+              onChange={(v) => onParallaxControlsChange({ useAlpha: v })}
+            >
+              Use alpha
+            </ToggleRow>
+          </div>
+        </ControlCard>
+      </div>
+      )}
+
       {showAi && (
       <div
         class="control-panel active"
@@ -415,3 +546,4 @@ export function ControlsPanel({
 ControlsPanel.defaultLightControls = DEFAULT_LIGHT_CONTROLS;
 ControlsPanel.defaultNormalControls = DEFAULT_NORMAL;
 ControlsPanel.defaultSpecularControls = DEFAULT_SPECULAR;
+ControlsPanel.defaultParallaxControls = DEFAULT_PARALLAX;

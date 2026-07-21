@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * normalizer CLI — normal- and specular-map generation.
+ * normalizer CLI — normal-, specular-, and parallax-map generation.
  *
  * Derived from Laigter's GPL-3.0 logic; mirrors the argument/exit contract of
  * core/tools/laigter_core_cli.cpp so scripts/run_core_cases.py can drive either
@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import pngjs from "pngjs";
 import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
 import { generateSpecularMap, DEFAULT_SPECULAR_PARAMS } from "../shared/specular.js";
+import { generateParallaxMap, DEFAULT_PARALLAX_PARAMS } from "../shared/parallax.js";
 
 const { PNG } = pngjs;
 
@@ -20,6 +21,7 @@ const USAGE = [
   "commands:",
   "  normal                           generate a tangent-space normal map",
   "  specular                         generate a specular reflectivity map",
+  "  parallax                         generate a parallax (height) map",
   "",
   "normal options:",
   "  --normal-depth <int>             emboss strength (default 250)",
@@ -40,6 +42,18 @@ const USAGE = [
   "  --specular-blur <int>            blur sigma (default 3)",
   "  --specular-invert                invert the map",
   "  --use-specular-alpha             copy the source alpha into the output",
+  "",
+  "parallax options:",
+  "  --parallax-type <binary|heightmap>  type (default binary)",
+  "  --parallax-max <int>             binary threshold / heightmap pivot (default 140)",
+  "  --parallax-min <int>             binary floor (default 0)",
+  "  --parallax-focus <int>           binary pre-blur sigma (default 2)",
+  "  --parallax-soft <int>            post-blur sigma (default 3)",
+  "  --parallax-erode-dilate <int>    >0 dilate / <0 erode, binary only (default 1)",
+  "  --parallax-brightness <int>      heightmap brightness offset (default 0)",
+  "  --parallax-contrast <float>      heightmap contrast (default 1.0)",
+  "  --parallax-invert                invert the map",
+  "  --use-parallax-alpha             copy the source alpha into the output",
 ].join("\n");
 
 function failUsage(message) {
@@ -149,6 +163,59 @@ function parseSpecularFlags(args) {
   return params;
 }
 
+function parseParallaxFlags(args) {
+  const params = { ...DEFAULT_PARALLAX_PARAMS };
+  for (let i = 3; i < args.length; i += 1) {
+    const arg = args[i];
+    switch (arg) {
+      case "--parallax-type": {
+        const v = requireValue(args, (i += 1), arg);
+        if (v !== "binary" && v !== "heightmap") {
+          fail(`${arg} must be binary or heightmap`);
+        }
+        params.parallaxType = v;
+        break;
+      }
+      case "--parallax-max":
+        params.parallaxMax = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--parallax-min":
+        params.parallaxMin = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--parallax-focus":
+        params.parallaxFocus = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--parallax-soft":
+        params.parallaxSoft = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--parallax-erode-dilate":
+        params.parallaxErodeDilate = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--parallax-brightness":
+        params.parallaxBrightness = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--parallax-contrast":
+        params.parallaxContrast = parseFloatNumber(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--parallax-invert":
+        params.parallaxInvert = true;
+        break;
+      case "--use-parallax-alpha":
+        params.useAlpha = true;
+        break;
+      default:
+        fail(`unknown option: ${arg}`);
+    }
+  }
+  return params;
+}
+
+const PARSERS = {
+  normal: parseNormalFlags,
+  specular: parseSpecularFlags,
+  parallax: parseParallaxFlags,
+};
+
 function parseArgs(args) {
   if (args.length === 0) {
     process.stdout.write(`${USAGE}\n`);
@@ -159,16 +226,22 @@ function parseArgs(args) {
     process.exit(0);
   }
   const command = args[0];
-  if (command !== "normal" && command !== "specular") {
+  const parser = PARSERS[command];
+  if (!parser) {
     fail(`unknown command: ${command}`);
   }
   if (args.length < 3) {
     failUsage("missing input/output arguments");
   }
 
-  const params = command === "normal" ? parseNormalFlags(args) : parseSpecularFlags(args);
-  return { command, inputPath: args[1], outputPath: args[2], params };
+  return { command, inputPath: args[1], outputPath: args[2], params: parser(args) };
 }
+
+const GENERATORS = {
+  normal: generateNormalMap,
+  specular: generateSpecularMap,
+  parallax: generateParallaxMap,
+};
 
 const { command, inputPath, outputPath, params } = parseArgs(process.argv.slice(2));
 
@@ -183,7 +256,7 @@ const source = { width: inputPng.width, height: inputPng.height, data: inputPng.
 
 let out;
 try {
-  out = command === "normal" ? generateNormalMap(source, params) : generateSpecularMap(source, params);
+  out = GENERATORS[command](source, params);
 } catch (error) {
   fail(error.message);
 }
