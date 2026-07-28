@@ -293,9 +293,17 @@ export function App() {
     // / Blur respect fake resolution without a manual Pixel size tweak.
     const detected = detectPixelSize(data, { tolerance: 2 });
     setSource(data);
-    setLightControls((prev) => (
-      prev.pixelSize === detected ? prev : { ...prev, pixelSize: detected }
-    ));
+    setLightControls((prev) => {
+      const next = {
+        ...prev,
+        pixelSize: detected,
+        // Crisp preview filtering whenever art-scale maps are in play.
+        ...(detected > 1 ? { pixelated: true } : {}),
+      };
+      return prev.pixelSize === next.pixelSize && prev.pixelated === next.pixelated
+        ? prev
+        : next;
+    });
     // Sample ships a precomputed DeepBump map; uploads clear AI until regenerate.
     setAiOverlay(aiNormalImage ? readSourceFromImage(aiNormalImage) : null);
     if (aiNormalImage) setPipeline("ai");

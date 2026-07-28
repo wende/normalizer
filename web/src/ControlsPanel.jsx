@@ -115,10 +115,13 @@ export function ControlsPanel({
             min={1}
             max={32}
             value={lightControls.pixelSize}
-            onChange={(v) => onLightControlsChange({ pixelSize: v })}
+            onChange={(v) => onLightControlsChange({
+              pixelSize: v,
+              ...(v > 1 ? { pixelated: true } : {}),
+            })}
             format={(v) => (v <= 1 ? "1 (off)" : `${v}×`)}
           />
-          <p class="hint">Auto-detected on load from solid-color runs; override if needed.</p>
+          <p class="hint">Auto-detected on load from solid-color runs; override if needed. Turns on Pixelated preview when &gt; 1.</p>
         </ControlCard>
 
         <ControlCard title="Diffuse">
