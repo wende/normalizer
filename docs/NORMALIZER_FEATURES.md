@@ -98,7 +98,6 @@ inventory in REWRITE_PLAN.md §2.
 | React + TS + Vite shell | §3 Phase 3.1 | Vanilla UI state handling starts fighting us (~4 more panels will roughly triple `app.js`). Cheap middle step available now: convert the shared module to TypeScript. | 🟡 Partial — Preact + Vite + JSX shell landed (`cd8084d` "Rewrite web UI in Preact"; `web/src/*.jsx`). Not React, not TS. |
 | WebGL2 port of `fshader.glsl` + full lights/ambient/specular/parallax preview | §3 Phase 3.2, §2 "Preview-only" | When parallax generation lands — a parallax map you can't preview is hard to tune. | 🟡 Partial — Canvas2D lit preview with specular/scatter light controls shipped (`b5b9dee`, `0a94e62`, `d4e9030`; `shared/preview.js`, `web/src/previewRender.js`). `web/src/litGL.js` is a WebGL2 lit preview that uses the specular map; parallax preview is a raw-map tab, not displacement-mapped lighting. |
 | Custom heightmap / specular base inputs (UI) | §2 "Inputs" | User demand. Generation code keeps accepting an optional height/specular source so only UI is missing. | 🟡 Partial — `generateSpecularMap(source, p, specularBase = source)` and `generateParallaxMap(source, p, height = source, bevelDistance = null)` accept optional sources; no UI loaders exist. `generateNormalMap` still takes no height/spec source. |
-| Paint overlays in UI | §3 "Deliberately deferred" | Same: core keeps accepting overlay buffers (already the upstream plan's stance). | ❌ Still deferred. `blendNormalOverlay` exists in `previewRender.js` for the AI normal, but there is no paint overlay input. |
 | Tauri desktop packaging | §3 Phase 3.1 | Only if folder-watch or distribution to non-terminal users becomes a goal; Node CLI covers batch until then. | ❌ Still deferred. |
 | Performance budget validation | §3 Phase 4.3 | Don't formalize; log recompute time in dev, look at it as each map lands. | ❌ Still deferred (no recompute-time logging in `web/`). |
 | New project zip format | §3 Phase 3.6 | Project firms up into a product. Until then: JSON settings export alongside PNGs. | ❌ Still deferred. |
@@ -115,6 +114,10 @@ inventory in REWRITE_PLAN.md §2.
   — DROPPED. No Emscripten/WASM/`.ts` anywhere in the tree; decision held.
 - ✅ ~~**Legacy preset import** and **`.laigter` project import**~~ — DROPPED.
   Neither present. (Revisit only if this becomes a public successor.)
+- ✅ ~~**Paint overlays in UI**~~ — DROPPED (2026-07-28). Hand-painted
+  height/normal overlays are out of scope for a personal tool; slider-driven
+  generation + AI normal blend cover the workflows that matter. No brush
+  canvas will be added. (`blendNormalOverlay` stays for the AI pipeline only.)
 - ✅ ~~**Lit-preview alpha / drop shadow**~~ — DROPPED for now. Shipped via
   `codex/park-alpha-shadow` (`762bc15`, merged `400cf3a`) as a preview-only
   contact shadow (band-projected silhouette + softness taps in
