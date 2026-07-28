@@ -27,9 +27,9 @@ test.describe("Normal Map Generator UI", () => {
 
   test("preview tab bar switches modes", async ({ page }) => {
     const tabs = page.locator(".preview-tab");
-    await expect(tabs).toHaveCount(4);
+    await expect(tabs).toHaveCount(5);
 
-    for (const mode of ["split", "lit", "normal", "diffuse"]) {
+    for (const mode of ["split", "lit", "normal", "base", "specular"]) {
       await page.locator(`.preview-tab[data-mode="${mode}"]`).click();
       await expect(page.locator(`.preview-tab[data-mode="${mode}"]`)).toHaveClass(/active/);
     }
@@ -66,10 +66,106 @@ test.describe("Normal Map Generator UI", () => {
 
   test("control cards render grouped sections", async ({ page }) => {
     const lightCards = page.locator("#lightPanel .control-card");
-    await expect(lightCards).toHaveCount(5);
+    await expect(lightCards).toHaveCount(6);
     await expect(page.locator(".control-card__title").filter({ hasText: "Diffuse" })).toBeVisible();
     await expect(page.locator(".control-card__title").filter({ hasText: "Specular" })).toBeVisible();
     await expect(page.locator(".control-card__title").filter({ hasText: "Ambient" })).toBeVisible();
+    await expect(page.locator(".control-card__title").filter({ hasText: "Shadow" })).toBeVisible();
+  });
+
+  test("lit preview casts an alpha shadow and exposes a draggable contact", async ({ page }) => {
+    await page.locator('.preview-tab[data-mode="lit"]').click();
+    await expect(page.locator("#shadowEnabled")).toBeChecked();
+    await page.waitForFunction(() => {
+      const stage = document.querySelector(".preview-stage");
+      return stage?.dataset.imageWidth && stage?.dataset.shadowContactY;
+    });
+
+    const before = await page.locator(".preview-stage").getAttribute("data-shadow-contact-y");
+    const coords = await page.evaluate(() => {
+      const canvas = document.querySelector("#previewCanvas");
+      const stage = document.querySelector(".preview-stage");
+      const bounds = canvas.getBoundingClientRect();
+      const left = Number(stage.dataset.imageLeft);
+      const top = Number(stage.dataset.imageTop);
+      const width = Number(stage.dataset.imageWidth);
+      const height = Number(stage.dataset.imageHeight);
+      return {
+        x: bounds.left + bounds.width * (left + width * 0.5),
+        y: bounds.top + bounds.height * (top + height),
+        targetY: bounds.top + bounds.height * (top + height * 0.82),
+      };
+    });
+
+    await page.mouse.move(coords.x, coords.y);
+    await page.mouse.down();
+    await page.mouse.move(coords.x, coords.targetY, { steps: 8 });
+    await page.mouse.up();
+
+    await expect.poll(() => page.locator(".preview-stage").getAttribute("data-shadow-contact-y")).not.toBe(before);
+    const after = Number(await page.locator(".preview-stage").getAttribute("data-shadow-contact-y"));
+    expect(after).toBeLessThan(0.9);
+
+    // A viewer-facing light projects into the upper-left, receding background
+    // rather than the foreground below the tree.
+    const shadowPixels = await page.evaluate(() => {
+      const canvas = document.querySelector("#previewGL");
+      const stage = document.querySelector(".preview-stage");
+      const gl = canvas.getContext("webgl2");
+      const data = new Uint8Array(canvas.width * canvas.height * 4);
+      gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      const left = Number(stage.dataset.imageLeft) * canvas.width;
+      const width = Number(stage.dataset.imageWidth) * canvas.width;
+      const top = Number(stage.dataset.imageTop) * canvas.height;
+      const height = Number(stage.dataset.imageHeight) * canvas.height;
+      let count = 0;
+      for (let y = Math.floor(top + height * 0.08); y < Math.floor(top + height * 0.45); y += 1) {
+        for (let x = Math.floor(left + width * 0.04); x < Math.floor(left + width * 0.23); x += 1) {
+          const offset = ((canvas.height - 1 - y) * canvas.width + x) * 4;
+          if (data[offset] < 40 && data[offset + 1] < 45 && data[offset + 2] < 42) count += 1;
+        }
+      }
+      return count;
+    });
+    expect(shadowPixels).toBeGreaterThan(0);
+  });
+
+  test("Canvas2D fallback renders the Lit shadow", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function patchedGetContext(type, ...args) {
+        return type === "webgl2" ? null : getContext.call(this, type, ...args);
+      };
+    });
+    try {
+      await page.goto(BASE);
+      await page.waitForSelector("#previewCanvas", { timeout: 15000 });
+      await page.waitForFunction(() => /\d+x\d+/.test(document.querySelector("#status")?.textContent || ""));
+      await page.locator('.preview-tab[data-mode="lit"]').click();
+      const shadowPixels = await page.evaluate(() => {
+        const canvas = document.querySelector("#previewCanvas");
+        const stage = document.querySelector(".preview-stage");
+        const ctx = canvas.getContext("2d");
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const left = Number(stage.dataset.imageLeft) * canvas.width;
+        const width = Number(stage.dataset.imageWidth) * canvas.width;
+        const top = Number(stage.dataset.imageTop) * canvas.height;
+        const height = Number(stage.dataset.imageHeight) * canvas.height;
+        let count = 0;
+        for (let y = Math.floor(top + height * 0.08); y < Math.floor(top + height * 0.45); y += 1) {
+          for (let x = Math.floor(left + width * 0.04); x < Math.floor(left + width * 0.23); x += 1) {
+            const offset = (y * canvas.width + x) * 4;
+            if (data[offset] < 40 && data[offset + 1] < 45 && data[offset + 2] < 42) count += 1;
+          }
+        }
+        return count;
+      });
+      expect(shadowPixels).toBeGreaterThan(0);
+    } finally {
+      await context.close();
+    }
   });
 
   test("canvas renders non-empty preview", async ({ page }) => {

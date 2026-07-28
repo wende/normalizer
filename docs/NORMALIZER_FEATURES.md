@@ -2,6 +2,8 @@
 
 Prioritized implement/defer/drop split of the remaining work from
 [REWRITE_PLAN.md](REWRITE_PLAN.md), decided 2026-07-06.
+Status re-verified 2026-07-29 after merging the occlusion, web-worker, and
+alpha-shadow branches.
 
 ## Decisions this plan is based on
 
@@ -39,7 +41,9 @@ Consequences:
 
 Ordered. Parameter names, ranges, and defaults for each map come from the
 inventory in REWRITE_PLAN.md §2.
-Status verified 2026-07-07 against git history and tree.
+
+**All four maps are now shipped.** The remaining work is workflow features
+(5–8), not generators.
 
 1. ✅ ~~**Shared algorithm module + Node CLI skeleton**~~ — DONE
    (`6e2414a`, `b5b9dee`). `shared/` holds `image.js`, `normal.js`,
@@ -50,8 +54,11 @@ Status verified 2026-07-07 against git history and tree.
 3. ✅ ~~**Specular map generation + panel**~~ — DONE (`8bcd80f`, `23fc05a`).
    `shared/specular.js`, `cli/normalizer.js specular` subcommand, web
    Specular panel + preview tab, `tests/specular.test.js`.
-4. ❌ **Occlusion map generation + panel** — NOT STARTED. Plan written in
-   `OCCLUSION_MAP_PLAN.md`; no `shared/occlusion.js` yet.
+4. ✅ ~~**Occlusion map generation + panel**~~ — DONE (merged
+   `add-occlusion-map`). `shared/occlusion.js` (flat + distance-transform
+   AO), `cli/normalizer.js occlusion` subcommand, web Occlusion panel +
+   preview tab, `tests/occlusion.test.js`. `shared/primitives.js` gained
+   `distanceTransform` (extracted from `alphaDistance`).
 5. ❌ **Export with suffix convention** — NOT STARTED. CLI takes a single
    explicit output path; no `_n/_p/_s/_o` logic anywhere. Web export uses
    `laigter-<map>.png` filenames instead (`App.jsx`).
@@ -63,26 +70,26 @@ Status verified 2026-07-07 against git history and tree.
    `h_frames`/`v_frames`/frame-list/fps code (the only "sprite"/"frame" hits
    in `web/` are the preview light sprite and a code comment).
 8. ❌ **Node CLI batch export** — NOT STARTED. `cli/normalizer.js` is
-   single-input/single-output, `normal`/`specular`/`parallax` subcommands
-   only; no folder scan, suffixes, recursion, or `--check-changes`.
+   single-input/single-output, `normal`/`specular`/`parallax`/`occlusion`
+   subcommands only; no folder scan, suffixes, recursion, or `--check-changes`.
 
 ## 2. Implement cheaply alongside (hygiene, not features)
 
-- ❌ **Single Web Worker recompute** — NOT STARTED. No `Worker`/`postMessage`
-  in `web/`; recompute is still on the main thread. (One worker + the
-  existing debounce, not the per-map worker pool from REWRITE_PLAN.md §3
-  Phase 3.3. Occlusion's distance transform and large blurs will jank the
-  main thread otherwise. Add the pool only if it ever hurts.)
+- ✅ ~~**Single Web Worker recompute**~~ — DONE (merged
+  `feat/web-worker-recompute`). The procedural normal recompute (EDT +
+  blurs, the expensive path) runs in `web/src/normal.worker.js` via
+  `useNormalWorker.js`; specular/parallax/occlusion stay on the main thread
+  (cheap). Add a per-map pool only if profiling shows it hurts.
 - 🟡 **Self-regression goldens** — PARTIAL. `make js-smoke` and
   `make preview-self-check` run the JS CLI and compare Node output against
   itself, but `tests/golden/manifest.json` still describes itself as
   "validating the Laigter rewrite against upstream Laigter" and the upstream
   PNGs are still checked in as the primary target for `make golden`. The
   full conversion (drop upstream comparison, keep only self-regression) is
-  not done.
-- 🟡 **Unit tests wired into npm** — PARTIAL. `npm test` runs
-  `tests/specular.test.js` and `tests/parallax.test.js`; there is no single
-  command that also runs `make js-smoke` / `make preview-self-check`.
+  not done. See `PREVIEW_GOLDEN_STRATEGY.md`.
+- ✅ ~~**Unit tests wired into npm**~~ — DONE. `npm test` runs
+  `tests/specular.test.js`, `tests/parallax.test.js`,
+  `tests/occlusion.test.js`, and `tests/shadow.test.js` (118 checks).
 
 ## 3. Defer (real value, wrong time — with re-entry triggers)
 
@@ -131,6 +138,11 @@ present. Consistent with the escape hatch: still reclaimable.
   Smooth / Steps (live) and Denoise / Overlap (regenerate). The model can be
   self-hosted by dropping `deepbump256.onnx` next to the worker and editing
   `DEFAULT_MODEL_URL`. Scope is normal maps only — no specular/roughness/AO.
+- **Lit-preview alpha shadow** (merged `codex/park-alpha-shadow`) —
+  `web/src/shadow.js` computes a contact-shadow projection with softness
+  taps; a Shadow card in the Light tab (enabled / caster height / opacity /
+  softness) and a draggable shadow-contact handle drive a shadow pass in the
+  `litGL` shader.
 - **Invert X/Y/Z is CLI-only by design** — the shared normal generator and
   the CLI support channel inversion, but the web UI deliberately does not
   expose it. These are pipeline-correction flags for CLI/batch use; in the
