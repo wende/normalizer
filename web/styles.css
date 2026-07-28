@@ -39,9 +39,15 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   background: var(--shell-bg);
   color: var(--ink);
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -98,9 +104,12 @@ input[type="range"]::-moz-range-thumb {
 
 /* Full-page app shell */
 .app {
-  height: 100vh;
+  height: 100%;
+  height: 100dvh;
+  max-width: 100vw;
+  overflow: hidden;
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto minmax(0, 1fr);
   background: var(--shell-bg);
 }
 
@@ -477,33 +486,140 @@ button:hover,
 
 @media (max-width: 960px) {
   .toolbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .toolbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .toolbar-divider {
+    display: none;
+  }
+
+  .actions {
+    flex: 0 0 auto;
+  }
+
+  button,
+  .file-button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  #exportButton {
+    padding: 8px 14px;
   }
 
   .preview-tab-bar {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
-    padding-bottom: 10px;
+    gap: 6px;
+    padding: 8px 12px 8px;
+    min-width: 0;
   }
 
   .preview-tabs {
     overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    scrollbar-width: thin;
+  }
+
+  .preview-tab {
+    flex: 0 0 auto;
+    padding: 8px 14px 9px;
+    font-size: 13px;
+  }
+
+  .preview-tab.active {
+    padding: 9px 14px 10px;
   }
 
   #status {
     padding-bottom: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .workspace {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(420px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    /* Preview fills leftover space; controls get a bounded scroll panel. */
+    grid-template-rows: minmax(0, 1fr) minmax(160px, 42%);
+    overflow: hidden;
+  }
+
+  .preview-area,
+  .preview-stage {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .controls {
     border-left: 0;
     border-top: 1px solid var(--header-border);
+    padding: 14px;
+    gap: 14px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .control-card {
+    padding: 14px;
+  }
+
+  .range-row {
+    gap: 10px;
+  }
+
+  .range-row > span:first-child {
+    width: 56px;
+    font-size: 13px;
+  }
+
+  .range-row output {
+    width: 40px;
+  }
+
+  .color-row input[type="color"] {
+    width: min(120px, 40vw);
+  }
+}
+
+@media (max-width: 480px) {
+  .toolbar {
+    padding: 8px 10px;
+  }
+
+  .brand {
+    font-size: 15px;
+  }
+
+  .mark {
+    width: 26px;
+    height: 26px;
+  }
+
+  .workspace {
+    grid-template-rows: minmax(0, 1fr) minmax(140px, 48%);
+  }
+
+  .preview-tab {
+    padding: 7px 11px 8px;
+    font-size: 12px;
+  }
+
+  .preview-tab.active {
+    padding: 8px 11px 9px;
   }
 }

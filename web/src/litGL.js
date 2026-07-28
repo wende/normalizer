@@ -249,8 +249,8 @@ export function createLitGL(canvas) {
     } = state;
     const ratio = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
-    const cw = Math.max(320, Math.round(bounds.width * ratio));
-    const ch = Math.max(240, Math.round(bounds.height * ratio));
+    const cw = Math.max(1, Math.round(bounds.width * ratio));
+    const ch = Math.max(1, Math.round(bounds.height * ratio));
     if (canvas.width !== cw || canvas.height !== ch) {
       canvas.width = cw;
       canvas.height = ch;
@@ -270,7 +270,11 @@ export function createLitGL(canvas) {
     if (mode === "parallax" && !parallax) return null;
     if (mode === "occlusion" && !occlusion) return null;
 
-    const rect = fitRect(source.width, source.height, cw - 48, ch - 48);
+    const pad = Math.min(48, Math.round(Math.min(cw, ch) * 0.04));
+    const rect = fitRect(source.width, source.height, Math.max(1, cw - pad * 2), Math.max(1, ch - pad * 2));
+    // Center the fitted image in the full canvas (fitRect origin is relative to the padded box).
+    rect.x += pad;
+    rect.y += pad;
     gl.useProgram(prog);
     gl.uniform2f(loc.uCanvasSize, cw, ch);
     gl.bindVertexArray(vao);
