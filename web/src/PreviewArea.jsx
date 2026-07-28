@@ -143,10 +143,19 @@ export function PreviewArea({
     paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs, stageRef.current);
   }, [drawArgs]);
 
+  // Redraw when the stage size changes (orientation, mobile chrome, layout stack)
+  // — window resize alone misses container-driven reflows.
   useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
     const handle = () => paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs, stageRef.current);
     window.addEventListener("resize", handle);
-    return () => window.removeEventListener("resize", handle);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(handle) : null;
+    ro?.observe(stage);
+    return () => {
+      window.removeEventListener("resize", handle);
+      ro?.disconnect();
+    };
   }, [drawArgs]);
 
   const eventPoint = (e) => canvasPointFromEvent(canvasRef.current, e);

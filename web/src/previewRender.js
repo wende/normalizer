@@ -244,8 +244,8 @@ export function drawPreview({
 }) {
   const ratio = window.devicePixelRatio || 1;
   const bounds = canvas.getBoundingClientRect();
-  const nextWidth = Math.max(320, Math.round(bounds.width * ratio));
-  const nextHeight = Math.max(240, Math.round(bounds.height * ratio));
+  const nextWidth = Math.max(1, Math.round(bounds.width * ratio));
+  const nextHeight = Math.max(1, Math.round(bounds.height * ratio));
   if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
     canvas.width = nextWidth;
     canvas.height = nextHeight;
@@ -279,7 +279,15 @@ export function drawPreview({
     return null;
   }
 
-  const rect = fitRect(source.width, source.height, canvas.width - 48, canvas.height - 48);
+  const pad = Math.min(48, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
+  const rect = fitRect(
+    source.width,
+    source.height,
+    Math.max(1, canvas.width - pad * 2),
+    Math.max(1, canvas.height - pad * 2),
+  );
+  rect.x += pad;
+  rect.y += pad;
   if (mode === "base") {
     drawImageData(ctx, source, rect, pixelated);
   } else if (mode === "specular") {
