@@ -83,6 +83,7 @@ export function buildSpecularParams(controls) {
   };
 }
 
+<<<<<<< HEAD
 // Parallax-map UI values. Contrast is a UI int 1-4000; buildParallaxParams
 // divides by 1000 to get the 0.001-4.0 float. Focus/soft/erode-dilate use
 // prettier UI defaults (3/10/0) than the shared/CLI defaults (2/3/1).
@@ -114,6 +115,31 @@ export function buildParallaxParams(controls) {
     parallaxBrightness: Number(controls.parallaxBrightness),
     parallaxContrast: Number(controls.parallaxContrast) / 1000,
     parallaxInvert: controls.parallaxInvert,
+=======
+// Occlusion-map UI values. Contrast is a UI int 1-4000; buildOcclusionParams
+// divides by 1000 to get the 0.001-4.0 float the engine wants. Bright/blur UI
+// defaults (10) are prettier out-of-box; the shared/CLI defaults are 16/3.
+export const DEFAULT_OCCLUSION = {
+  occlusionThresh: 1,
+  occlusionContrast: 1000,
+  occlusionBright: 10,
+  occlusionBlur: 10,
+  occlusionDistanceMode: true,
+  occlusionDistance: 10,
+  occlusionInvert: false,
+  useAlpha: false,
+};
+
+export function buildOcclusionParams(controls) {
+  return {
+    occlusionThresh: Number(controls.occlusionThresh),
+    occlusionContrast: Number(controls.occlusionContrast) / 1000,
+    occlusionBright: Number(controls.occlusionBright),
+    occlusionBlur: Number(controls.occlusionBlur),
+    occlusionDistanceMode: controls.occlusionDistanceMode,
+    occlusionDistance: Number(controls.occlusionDistance),
+    occlusionInvert: controls.occlusionInvert,
+>>>>>>> add-occlusion-map
     useAlpha: controls.useAlpha,
   };
 }

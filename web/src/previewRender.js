@@ -6,7 +6,11 @@
 
 import { generateNormalMap } from "shared/normal.js";
 import { generateSpecularMap } from "shared/specular.js";
+<<<<<<< HEAD
 import { generateParallaxMap } from "shared/parallax.js";
+=======
+import { generateOcclusionMap } from "shared/occlusion.js";
+>>>>>>> add-occlusion-map
 import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "shared/preview.js";
 
 export function hexToRgb01(hex) {
@@ -136,8 +140,13 @@ export function generateSpecular(source, params) {
   return new ImageData(out.data, out.width, out.height);
 }
 
+<<<<<<< HEAD
 export function generateParallax(source, params) {
   const out = generateParallaxMap(source, params);
+=======
+export function generateOcclusion(source, params) {
+  const out = generateOcclusionMap(source, params);
+>>>>>>> add-occlusion-map
   return new ImageData(out.data, out.width, out.height);
 }
 
@@ -224,7 +233,11 @@ export function drawPreview({
   source,
   normal,
   specular,
+<<<<<<< HEAD
   parallax,
+=======
+  occlusion,
+>>>>>>> add-occlusion-map
   litCache,
   mode,
   pipeline,
@@ -250,10 +263,17 @@ export function drawPreview({
     return null;
   }
 
+<<<<<<< HEAD
   // Only the Base view renders without a generated map. Specular/Parallax need
   // their own map; Split/Lit/Normal need a normal map — and in the AI pipeline
   // "no normal yet" means "not generated", so show a hint rather than a blank.
   const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax";
+=======
+  // Only the Base view renders without a generated map. Specular/Occlusion need
+  // their own map; Split/Lit/Normal need a normal map — and in the AI pipeline
+  // "no normal yet" means "not generated", so show a hint rather than a blank.
+  const needsNormal = mode !== "base" && mode !== "specular" && mode !== "occlusion";
+>>>>>>> add-occlusion-map
   if (needsNormal && !normal) {
     if (pipeline === "ai") {
       drawAiPlaceholder(ctx, canvas);
@@ -263,7 +283,11 @@ export function drawPreview({
   if (mode === "specular" && !specular) {
     return null;
   }
+<<<<<<< HEAD
   if (mode === "parallax" && !parallax) {
+=======
+  if (mode === "occlusion" && !occlusion) {
+>>>>>>> add-occlusion-map
     return null;
   }
 
@@ -272,8 +296,13 @@ export function drawPreview({
     drawImageData(ctx, source, rect, pixelated);
   } else if (mode === "specular") {
     drawImageData(ctx, specular, rect, pixelated);
+<<<<<<< HEAD
   } else if (mode === "parallax") {
     drawImageData(ctx, parallax, rect, pixelated);
+=======
+  } else if (mode === "occlusion") {
+    drawImageData(ctx, occlusion, rect, pixelated);
+>>>>>>> add-occlusion-map
   } else if (mode === "lit") {
     drawImageData(ctx, litCache || normal, rect, pixelated);
   } else if (mode === "normal") {
