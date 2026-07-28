@@ -61,7 +61,7 @@ inventory in REWRITE_PLAN.md §2.
    `distanceTransform` (extracted from `alphaDistance`).
 5. ❌ **Export with suffix convention** — NOT STARTED. CLI takes a single
    explicit output path; no `_n/_p/_s/_o` logic anywhere. Web export uses
-   `laigter-<map>.png` filenames instead (`App.jsx`).
+   `normalizer-<map>.png` filenames instead (`App.jsx`).
 6. ❌ **Tileable 3×3 neighbour mosaics** — NOT STARTED. No tileX/tileY,
    mosaic, or center-crop code. (Original intent: compute on mosaic, crop
    center, per REWRITE_PLAN.md §1 "Tileability"; plain self-tiling first,

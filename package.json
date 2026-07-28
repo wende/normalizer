@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Laigter-derived normal/texture-map generator with a dependency-free JS core shared by the browser app and a Node CLI.",
+  "description": "Normalizer — a normal/texture-map generator with a dependency-free JS core shared by the browser app and a Node CLI.",
   "license": "GPL-3.0",
   "scripts": {
     "build": "vite build",

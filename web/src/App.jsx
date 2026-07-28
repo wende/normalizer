@@ -31,7 +31,7 @@ import { useNormalWorker } from "./useNormalWorker.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
-const LIGHT_SPRITE_SRC = "./laigter_texture.png";
+const LIGHT_SPRITE_SRC = "./normalizer_texture.png";
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
 
 async function decodeImage(src) {
@@ -348,10 +348,10 @@ export function App() {
         onOpenFile={onOpenFile}
         onLoadSample={loadSample}
         onExport={() => {
-          if (mode === "specular") return exportPng(specularMap, "laigter-specular.png");
-          if (mode === "parallax") return exportPng(parallaxMap, "laigter-parallax.png");
-          if (mode === "occlusion") return exportPng(occlusionMap, "laigter-occlusion.png");
-          return exportPng(activeNormal, "laigter-normal.png");
+          if (mode === "specular") return exportPng(specularMap, "normalizer-specular.png");
+          if (mode === "parallax") return exportPng(parallaxMap, "normalizer-parallax.png");
+          if (mode === "occlusion") return exportPng(occlusionMap, "normalizer-occlusion.png");
+          return exportPng(activeNormal, "normalizer-normal.png");
         }}
       />
       <PreviewTabBar

@@ -20,7 +20,7 @@ test.describe("Normal Map Generator UI", () => {
     const box = await page.locator(".app").boundingBox();
     const viewport = page.viewportSize();
     expect(box?.width).toBeGreaterThanOrEqual((viewport?.width ?? 0) - 2);
-    await expect(page.locator(".brand")).toContainText("Laigter Web MVP");
+    await expect(page.locator(".brand")).toContainText("Normalizer");
     await expect(page.locator("#exportButton")).toBeVisible();
     await expect(page.locator("#sampleButton")).toBeVisible();
   });

@@ -16,7 +16,7 @@ const ROOT_STATIC_ASSETS = [
   "deepbump_infer.js",
   "demo.png",
   "demo_ai_normal.png",
-  "laigter_texture.png",
+  "normalizer_texture.png",
 ];
 
 function copyRootStaticAssets() {

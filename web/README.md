@@ -1,4 +1,4 @@
-# Laigter Web MVP
+# Normalizer Web
 
 Start the local dev server:
 
@@ -27,7 +27,7 @@ and generates normal, specular, and parallax maps. The preview tab bar has
 six modes — Base, Split, Lit, Normal, Specular, Parallax — and each map
 updates on slider changes with a 40 ms debounce. The Light tab includes the
 upstream Pixelated/Toon render toggles; the toolbar exports the currently
-visible map as `laigter-<map>.png`. No server-side processing is required
+visible map as `normalizer-<map>.png`. No server-side processing is required
 for any of it.
 
 ## AI normal generator (DeepBump, in the browser)

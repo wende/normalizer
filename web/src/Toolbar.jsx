@@ -16,7 +16,7 @@ export function Toolbar({ onOpenFile, onLoadSample, onExport }) {
       <div class="toolbar-left">
         <div class="brand">
           <span class="mark" aria-hidden="true"></span>
-          <span>Laigter Web MVP</span>
+          <span>Normalizer</span>
         </div>
         <span class="toolbar-divider" aria-hidden="true"></span>
         <div class="toolbar-actions">
