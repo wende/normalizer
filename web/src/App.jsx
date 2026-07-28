@@ -28,6 +28,7 @@ import {
 } from "./previewRender.js";
 import { adjustNormalMap } from "./normalAdjust.js";
 import { useNormalWorker } from "./useNormalWorker.js";
+import { detectPixelSize } from "shared/pixelScale.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
@@ -117,6 +118,20 @@ export function App() {
     setAiControls((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  const onDetectPixelSize = useCallback(() => {
+    if (!source) {
+      setStatus("Load an image first.");
+      return;
+    }
+    const detected = detectPixelSize(source, { tolerance: 2 });
+    setLightControls((prev) => ({ ...prev, pixelSize: detected }));
+    setStatus(
+      detected > 1
+        ? `Detected pixel size ${detected}×`
+        : "No upscale detected (pixel size 1)",
+    );
+  }, [source]);
+
   // Switch pipeline, keeping the controls tab valid for the new pipeline
   // (Normal <-> AI are pipeline-specific; Light and Specular are shared).
   const onPipelineChange = useCallback((next) => {
@@ -191,7 +206,7 @@ export function App() {
     if (!source) return;
     clearTimeout(generateTimer.current);
     generateTimer.current = setTimeout(() => {
-      const params = buildNormalParams(normalControls);
+      const params = buildNormalParams(normalControls, lightControls.pixelSize);
       requestNormal(
         { width: source.width, height: source.height, data: source.data },
         params,
@@ -205,39 +220,39 @@ export function App() {
       });
     }, 40);
     return () => clearTimeout(generateTimer.current);
-  }, [source, normalControls]);
+  }, [source, normalControls, lightControls.pixelSize]);
 
   // Specular map — recomputed (debounced) from the source + specular sliders.
   useEffect(() => {
     if (!source) return;
     clearTimeout(specularTimer.current);
     specularTimer.current = setTimeout(() => {
-      const params = buildSpecularParams(specularControls);
+      const params = buildSpecularParams(specularControls, lightControls.pixelSize);
       setSpecularMap(generateSpecular(source, params));
     }, 40);
     return () => clearTimeout(specularTimer.current);
-  }, [source, specularControls]);
+  }, [source, specularControls, lightControls.pixelSize]);
 
   // Parallax map — recomputed (debounced) from the source + parallax sliders.
   useEffect(() => {
     if (!source) return;
     clearTimeout(parallaxTimer.current);
     parallaxTimer.current = setTimeout(() => {
-      const params = buildParallaxParams(parallaxControls);
+      const params = buildParallaxParams(parallaxControls, lightControls.pixelSize);
       setParallaxMap(generateParallax(source, params));
     }, 40);
     return () => clearTimeout(parallaxTimer.current);
-  }, [source, parallaxControls]);
+  }, [source, parallaxControls, lightControls.pixelSize]);
   // Occlusion map — recomputed (debounced) from the source + occlusion sliders.
   useEffect(() => {
     if (!source) return;
     clearTimeout(occlusionTimer.current);
     occlusionTimer.current = setTimeout(() => {
-      const params = buildOcclusionParams(occlusionControls);
+      const params = buildOcclusionParams(occlusionControls, lightControls.pixelSize);
       setOcclusionMap(generateOcclusion(source, params));
     }, 40);
     return () => clearTimeout(occlusionTimer.current);
-  }, [source, occlusionControls]);
+  }, [source, occlusionControls, lightControls.pixelSize]);
 
   // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
   // only update a shader uniform, so no ImageData is rebuilt per drag here.
@@ -376,6 +391,7 @@ export function App() {
           onGenerateAI={onGenerateAI}
           aiBusy={aiBusy}
           aiReady={!!aiOverlay}
+          onDetectPixelSize={onDetectPixelSize}
         />
       </section>
     </main>

@@ -15,6 +15,12 @@
 
 import { grayscaleFromRgba } from "./image.js";
 import { alphaDistance, gaussianBlur, dilate, erode } from "./primitives.js";
+import {
+  downsampleFloat,
+  downsampleRgba,
+  normalizePixelSize,
+  upsampleNearest,
+} from "./pixelScale.js";
 
 /**
  * Default parallax-map parameters. Mirrors the CLI defaults so both share one
@@ -22,6 +28,9 @@ import { alphaDistance, gaussianBlur, dilate, erode } from "./primitives.js";
  * biselDistance/softBisel are internal inputs to the HeightMap bevel-distance
  * recompute (the same buffer the normal path produces); they are not user-facing
  * parallax knobs and have no CLI flag / UI slider.
+ *
+ * `pixelSize` > 1: soft/focus blur run at logical (art) resolution — see
+ * shared/pixelScale.js.
  */
 export const DEFAULT_PARALLAX_PARAMS = {
   parallaxType: "binary",
@@ -38,6 +47,7 @@ export const DEFAULT_PARALLAX_PARAMS = {
   // the §5.8 cache hooks let this share the normal path's buffer.
   biselDistance: 60,
   softBisel: true,
+  pixelSize: 1,
 };
 
 /**
@@ -71,6 +81,17 @@ function computeBevelDistance(source, p) {
  * only); if absent it is recomputed locally from biselDistance/softBisel.
  */
 export function generateParallaxMap(source, p, height = source, bevelDistance = null) {
+  const scale = normalizePixelSize(p?.pixelSize);
+  if (scale > 1) {
+    const lowSrc = downsampleRgba(source, scale);
+    const lowHeight = height === source ? lowSrc : downsampleRgba(height, scale);
+    const lowBevel = bevelDistance
+      ? downsampleFloat(bevelDistance, source.width, source.height, scale)
+      : null;
+    const out = generateParallaxMap(lowSrc, { ...p, pixelSize: 1 }, lowHeight, lowBevel);
+    return upsampleNearest(out, source.width, source.height, scale);
+  }
+
   const width = source.width;
   const heightPx = source.height;
   let par = grayscaleFromRgba(height);

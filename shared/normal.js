@@ -9,10 +9,15 @@
 
 import { grayscaleFromRgba } from "./image.js";
 import { alphaDistance, gaussianBlur } from "./primitives.js";
+import { atPixelScale, normalizePixelSize } from "./pixelScale.js";
 
 /**
  * Default normal-map parameters. Mirrors core/include/laigter_core.h so the CLI
  * and the browser share one source of truth.
+ *
+ * `pixelSize` > 1 treats the source as nearest-neighbour upscaled pixel art:
+ * processing (blur, bevel distance, gradients) runs at logical resolution so
+ * Soft respects art pixels, then the map is nearest-upsampled.
  */
 export const DEFAULT_NORMAL_PARAMS = {
   normalDepth: 250,
@@ -25,6 +30,7 @@ export const DEFAULT_NORMAL_PARAMS = {
   invertY: false,
   invertZ: false,
   useAlpha: false,
+  pixelSize: 1,
 };
 
 /**
@@ -86,6 +92,13 @@ export function calculateNormal(height, alpha, width, heightPx, depth, blurRadiu
  * compositing (e.g. the AI normal blend) stays with the caller.
  */
 export function generateNormalMap(source, p) {
+  const scale = normalizePixelSize(p?.pixelSize);
+  if (scale > 1) {
+    return atPixelScale(source, scale, (low) =>
+      generateNormalMap(low, { ...p, pixelSize: 1 }),
+    );
+  }
+
   const width = source.width;
   const height = source.height;
   const gray = grayscaleFromRgba(source);
