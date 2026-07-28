@@ -1,8 +1,9 @@
 /*
  * Lit-preview WebGL2 renderer — derived from laigter/shaders/fshader.glsl
- * (view_mode==5, single light, parallax off, occlusion=1). The fragment
- * shader mirrors the per-pixel math of buildLitPreview in shared/preview.js,
- * which stays the CPU parity reference and the no-WebGL fallback.
+ * (view_mode==5, single light). Steep parallax mapping in lit/split modes
+ * follows Laigter's ParallaxMapping layer loop (WebGL-only; CPU fallback in
+ * previewRender.js has no parallax). The fragment shader mirrors the per-pixel
+ * math of buildLitPreview in shared/preview.js for the non-parallax path.
  *
  * Why this exists: the JS loop in buildLitPreview is O(W·H) on every light
  * move. On the GPU the light is a uniform, so dragging is resolution-
@@ -34,23 +35,61 @@ out vec4 frag;
 uniform int uMode;          // 0 = passthrough, 1 = lit
 uniform sampler2D uTex;     // diffuse/albedo (always the source image)
 uniform sampler2D uNormal;  // tangent-space normal map
+uniform sampler2D uParallax;
+uniform sampler2D uSpecularMap;
 uniform vec2 uResolution;   // source pixel dims
 uniform vec3 uLightPos;     // (x, y, lightZ) — x/y in pixels rel. center, lightZ already *1000
 uniform vec3 uDiffuseColor;  uniform float uDiffuseIntensity;
 uniform vec3 uSpecularColor; uniform float uSpecularIntensity; uniform float uSpecularScatter;
-uniform sampler2D uSpecularMap;  // specular reflectivity map (grayscale)
 uniform int uHasSpecularMap;     // 0 = full reflectivity, 1 = sample uSpecularMap
+uniform int uHasParallax;
+uniform float uHeightScale;
+uniform vec2 uViewTilt;
 uniform vec3 uAmbientColor;  uniform float uAmbientIntensity;
 uniform int uToon;
+
+vec2 parallaxMapping(vec2 texCoords, vec3 viewDir) {
+  const float minLayers = 10.0;
+  const float maxLayers = 100.0;
+  float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));
+  float layerDepth = 1.0 / numLayers;
+  float currentLayerDepth = 0.0;
+  vec2 P = viewDir.xy * uHeightScale;
+  vec2 deltaTexCoords = P / numLayers;
+  vec2 currentTexCoords = texCoords;
+  float currentDepthMapValue = texture(uParallax, currentTexCoords).r;
+  while (currentLayerDepth < currentDepthMapValue) {
+    currentTexCoords.y += deltaTexCoords.y;
+    currentTexCoords.x -= deltaTexCoords.x;
+    currentDepthMapValue = texture(uParallax, currentTexCoords).r;
+    currentLayerDepth += layerDepth;
+  }
+  vec2 prevTexCoords = vec2(
+    currentTexCoords.x + deltaTexCoords.x,
+    currentTexCoords.y - deltaTexCoords.y
+  );
+  float afterDepth = currentDepthMapValue - currentLayerDepth;
+  float beforeDepth = texture(uParallax, prevTexCoords).r - currentLayerDepth + layerDepth;
+  float weight = afterDepth / (afterDepth - beforeDepth);
+  return prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+}
+
 void main() {
-  vec4 tex = texture(uTex, vUV);
+  vec2 uv = vUV;
+  if (uMode == 1 && uHasParallax != 0 && uHeightScale > 0.0) {
+    vec3 viewDir = normalize(vec3(uViewTilt.x, uViewTilt.y, 1.0));
+    uv = parallaxMapping(uv, viewDir);
+    if (uv.x > 1.0 || uv.y > 1.0 || uv.x < 0.0 || uv.y < 0.0) {
+      frag = vec4(0.0);
+      return;
+    }
+  }
+  vec4 tex = texture(uTex, uv);
   if (uMode == 0) { frag = tex; return; }
-  vec3 n01 = texture(uNormal, vUV).rgb;
+  vec3 n01 = texture(uNormal, uv).rgb;
   vec3 N = vec3(n01.r * 2.0 - 1.0, n01.g * 2.0 - 1.0, n01.b * 2.0 - 1.0);
-  // Match buildLitPreview's pixel grid: vUV lands on pixel centers, so
-  // vUV*resolution == (px+0.5). fx = (px+0.5)-centerX, fy = centerY-(py+0.5).
-  float fx = vUV.x * uResolution.x - uResolution.x * 0.5;
-  float fy = uResolution.y * 0.5 - vUV.y * uResolution.y;
+  float fx = uv.x * uResolution.x - uResolution.x * 0.5;
+  float fy = uResolution.y * 0.5 - uv.y * uResolution.y;
   vec3 L = normalize(vec3(uLightPos.x - fx, uLightPos.y - fy, uLightPos.z));
   float diff = max(0.0, dot(N, L));
   if (uToon == 1) diff = smoothstep(0.495, 0.505, diff);
@@ -58,7 +97,7 @@ void main() {
   vec3 R = reflect(-L, N);
   float spec = pow(max(0.0, R.z), uSpecularScatter);
   if (uToon == 1) spec = smoothstep(0.005, 0.01, spec);
-  vec3 specMap = (uHasSpecularMap == 1) ? texture(uSpecularMap, vUV).rgb : vec3(1.0);
+  vec3 specMap = (uHasSpecularMap == 1) ? texture(uSpecularMap, uv).rgb : vec3(1.0);
   vec3 specular = uSpecularIntensity * spec * uSpecularColor * specMap;
   vec3 ambient = uAmbientColor * uAmbientIntensity;
   frag = vec4(tex.rgb * (diffuse + specular + ambient), tex.a);
@@ -97,10 +136,10 @@ export function createLitGL(canvas) {
 
   const loc = {};
   for (const name of [
-    "uCanvasSize", "uMode", "uTex", "uNormal", "uResolution", "uLightPos",
+    "uCanvasSize", "uMode", "uTex", "uNormal", "uParallax", "uResolution", "uLightPos",
     "uDiffuseColor", "uDiffuseIntensity", "uSpecularColor", "uSpecularIntensity",
-    "uSpecularScatter", "uSpecularMap", "uHasSpecularMap",
-    "uAmbientColor", "uAmbientIntensity", "uToon",
+    "uSpecularScatter", "uSpecularMap", "uHasSpecularMap", "uHasParallax", "uHeightScale",
+    "uViewTilt", "uAmbientColor", "uAmbientIntensity", "uToon",
   ]) {
     loc[name] = gl.getUniformLocation(prog, name);
   }
@@ -117,12 +156,9 @@ export function createLitGL(canvas) {
   gl.bindVertexArray(null);
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture(), parallax: gl.createTexture() };
-  const ref = { source: null, normal: null, specular: null, parallax: null };
+  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture(), parallax: gl.createTexture(), occlusion: gl.createTexture() };
+  const ref = { source: null, normal: null, specular: null, parallax: null, occlusion: null };
 
-  // Upload (or re-upload) an ImageData into its slot only when the reference
-  // changes; always (re)apply the min/mag filter — cheap, and `pixelated` can
-  // toggle independently of the data.
   function upload(key, image, pixelated) {
     if (!image) return;
     const t = tex[key];
@@ -162,10 +198,11 @@ export function createLitGL(canvas) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  function drawLit(source, normal, settings, toon, pixelated, specular = null) {
+  function drawLit(source, normal, settings, toon, pixelated, specular, parallax, viewTilt, heightScale) {
     upload("source", source, pixelated);
     upload("normal", normal, pixelated);
     if (specular) upload("specular", specular, pixelated);
+    if (parallax) upload("parallax", parallax, pixelated);
     bindUnit(0, tex.source);
     gl.uniform1i(loc.uTex, 0);
     bindUnit(1, tex.normal);
@@ -177,6 +214,15 @@ export function createLitGL(canvas) {
     } else {
       gl.uniform1i(loc.uHasSpecularMap, 0);
     }
+    if (parallax) {
+      bindUnit(3, tex.parallax);
+      gl.uniform1i(loc.uParallax, 3);
+      gl.uniform1i(loc.uHasParallax, 1);
+    } else {
+      gl.uniform1i(loc.uHasParallax, 0);
+    }
+    gl.uniform1f(loc.uHeightScale, heightScale ?? 0);
+    gl.uniform2f(loc.uViewTilt, viewTilt?.x ?? 0, viewTilt?.y ?? 0);
     gl.uniform1i(loc.uMode, 1);
     gl.uniform2f(loc.uResolution, source.width, source.height);
     gl.uniform3f(loc.uLightPos, settings.x, settings.y, settings.z * 1000);
@@ -191,13 +237,11 @@ export function createLitGL(canvas) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  /**
-   * Render the current mode into the canvas. Returns the fitted rect (for
-   * overlay hit-testing) or null when there is nothing to draw.
-   * `normal` is the active normal for the current pipeline (procedural or AI).
-   */
   function draw(state) {
-    const { source, normal, specular, parallax, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
+    const {
+      source, normal, specular, parallax, occlusion, mode, lightSettings, toon, pixelated,
+      splitRatio = 0.5, viewTilt, heightScale,
+    } = state;
     const ratio = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
     const cw = Math.max(320, Math.round(bounds.width * ratio));
@@ -215,10 +259,11 @@ export function createLitGL(canvas) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     if (!source) return null;
-    const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax";
-    if (needsNormal && !normal) return null; // overlay draws the AI placeholder
+    const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax" && mode !== "occlusion";
+    if (needsNormal && !normal) return null;
     if (mode === "specular" && !specular) return null;
     if (mode === "parallax" && !parallax) return null;
+    if (mode === "occlusion" && !occlusion) return null;
 
     const rect = fitRect(source.width, source.height, cw - 48, ch - 48);
     gl.useProgram(prog);
@@ -232,17 +277,18 @@ export function createLitGL(canvas) {
       drawPassthrough("specular", specular, pixelated);
     } else if (mode === "parallax") {
       drawPassthrough("parallax", parallax, pixelated);
+    } else if (mode === "occlusion") {
+      drawPassthrough("occlusion", occlusion, pixelated);
     } else if (mode === "normal") {
       drawPassthrough("normal", normal, pixelated);
     } else if (mode === "lit") {
-      drawLit(source, normal, lightSettings, toon, pixelated, specular);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale);
     } else {
-      // split: diffuse underneath, lit over the right portion.
       drawPassthrough("source", source, pixelated);
       const splitPx = Math.round(rect.width * splitRatio);
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(rect.x + splitPx, ch - rect.y - rect.height, rect.width - splitPx, rect.height);
-      drawLit(source, normal, lightSettings, toon, pixelated, specular);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale);
       gl.disable(gl.SCISSOR_TEST);
     }
 
@@ -254,9 +300,6 @@ export function createLitGL(canvas) {
     queueMicrotask(selfTest);
   }
 
-  // Dev-only parity check: render a small fixed fixture through both the CPU
-  // reference (buildLitPreview) and this shader, warn if they diverge beyond a
-  // few LSB. Catches uniform/math drift between the two implementations.
   function selfTest() {
     try {
       const W = 16;
@@ -295,7 +338,7 @@ export function createLitGL(canvas) {
       gl.uniform2f(loc.uCanvasSize, W, H);
       gl.bindVertexArray(vao);
       setQuad({ x: 0, y: 0, width: W, height: H });
-      drawLit(source, normal, settings, false, false, specular);
+      drawLit(source, normal, settings, false, false, specular, null, { x: 0, y: 0 }, 0);
 
       const gpu = new Uint8Array(W * H * 4);
       gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, gpu);
@@ -304,7 +347,6 @@ export function createLitGL(canvas) {
       gl.deleteTexture(off);
       gl.bindVertexArray(null);
 
-      // readPixels is bottom-up; CPU data is top-down — flip while comparing.
       let max = 0;
       for (let y = 0; y < H; y += 1) {
         for (let x = 0; x < W; x += 1) {
@@ -314,12 +356,11 @@ export function createLitGL(canvas) {
           }
         }
       }
-      // Force a re-upload of the real textures on the next draw (the self-test
-      // polluted the slot caches with the fixture).
       ref.source = null;
       ref.normal = null;
       ref.specular = null;
       ref.parallax = null;
+      ref.occlusion = null;
       if (max > 3) {
         console.warn(`[litGL] shader/CPU parity delta = ${max} (expected ≤3 LSB)`);
       } else {

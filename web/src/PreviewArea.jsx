@@ -12,6 +12,12 @@ import {
 } from "./previewRender.js";
 import { createLitGL } from "./litGL.js";
 
+const VIEW_TILT_SENSITIVITY = 2.0;
+
+function clampTilt(v) {
+  return Math.max(-1, Math.min(1, v));
+}
+
 function drawSplitDivider(octx, rect, splitRatio, dragging) {
   const ratio = window.devicePixelRatio || 1;
   const x = splitDividerX(rect, splitRatio);
@@ -25,12 +31,20 @@ function drawSplitDivider(octx, rect, splitRatio, dragging) {
   octx.restore();
 }
 
+function isLitCanvasMode(mode) {
+  return mode === "lit" || mode === "split";
+}
+
 // Canvas2D overlay painted on top of the WebGL canvas: light handle, split
 // divider, and the AI "not generated yet" hint. Transparent except for these.
 function drawOverlay(octx, canvas, drawArgs, rect) {
   octx.clearRect(0, 0, canvas.width, canvas.height);
   if (!rect) {
-    if (drawArgs.mode !== "base" && drawArgs.mode !== "specular" && drawArgs.mode !== "parallax" && drawArgs.pipeline === "ai") {
+    const skipPlaceholder = drawArgs.mode === "base"
+      || drawArgs.mode === "specular"
+      || drawArgs.mode === "parallax"
+      || drawArgs.mode === "occlusion";
+    if (!skipPlaceholder && drawArgs.pipeline === "ai") {
       drawAiPlaceholder(octx, canvas);
     }
     return;
@@ -43,7 +57,7 @@ function drawOverlay(octx, canvas, drawArgs, rect) {
 
 function cpuFallback(overlay, octx, drawArgs) {
   const {
-    source, normal, specular, parallax, mode, pipeline, light, pixelated, draggingLight, lightSprite,
+    source, normal, specular, parallax, occlusion, mode, pipeline, light, pixelated, draggingLight, lightSprite,
     lightSettings, toon, splitRatio,
   } = drawArgs;
   const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular) : null;
@@ -54,6 +68,7 @@ function cpuFallback(overlay, octx, drawArgs) {
     normal,
     specular,
     parallax,
+    occlusion,
     litCache,
     mode,
     pipeline,
@@ -80,11 +95,14 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
       normal: drawArgs.normal,
       specular: drawArgs.specular,
       parallax: drawArgs.parallax,
+      occlusion: drawArgs.occlusion,
       mode: drawArgs.mode,
       lightSettings: drawArgs.lightSettings,
       toon: drawArgs.toon,
       pixelated: drawArgs.pixelated,
       splitRatio: drawArgs.splitRatio ?? 0.5,
+      viewTilt: drawArgs.viewTilt,
+      heightScale: drawArgs.heightScale,
     });
     if (overlay.width !== glCanvas.width || overlay.height !== glCanvas.height) {
       overlay.width = glCanvas.width;
@@ -106,6 +124,7 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
 export function PreviewArea({
   drawArgs,
   onLightMove,
+  onViewTilt,
   onSplitRatioChange,
   splitRatio,
   lightSprite,
@@ -116,7 +135,7 @@ export function PreviewArea({
   const stageRef = useRef(null);
   const glRef = useRef(null);
   const glInitRef = useRef(false);
-  const dragState = useRef({ kind: null, pointerId: null });
+  const dragState = useRef({ kind: null, pointerId: null, lastPoint: null });
 
   useEffect(() => {
     paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs, stageRef.current);
@@ -142,7 +161,11 @@ export function PreviewArea({
       canvas.style.cursor = "col-resize";
       return;
     }
-    canvas.style.cursor = pointHitsLight(point, drawArgs.light, source, rect) ? "grab" : "";
+    if (pointHitsLight(point, drawArgs.light, source, rect)) {
+      canvas.style.cursor = "grab";
+      return;
+    }
+    canvas.style.cursor = isLitCanvasMode(drawArgs.mode) ? "grab" : "";
   };
 
   const handlePointerDown = (e) => {
@@ -153,7 +176,7 @@ export function PreviewArea({
 
     if (drawArgs.mode === "split" && pointHitsSplitDivider(point, rect, splitRatio)) {
       e.preventDefault();
-      dragState.current = { kind: "split", pointerId: e.pointerId };
+      dragState.current = { kind: "split", pointerId: e.pointerId, lastPoint: point };
       canvasRef.current.setPointerCapture(e.pointerId);
       canvasRef.current.style.cursor = "col-resize";
       drawArgs.onSplitDragChange(true);
@@ -161,12 +184,21 @@ export function PreviewArea({
       return;
     }
 
-    if (!pointHitsLight(point, drawArgs.light, source, rect)) return;
-    e.preventDefault();
-    dragState.current = { kind: "light", pointerId: e.pointerId };
-    canvasRef.current.setPointerCapture(e.pointerId);
-    canvasRef.current.style.cursor = "grabbing";
-    drawArgs.onDragChange(true);
+    if (pointHitsLight(point, drawArgs.light, source, rect)) {
+      e.preventDefault();
+      dragState.current = { kind: "light", pointerId: e.pointerId, lastPoint: point };
+      canvasRef.current.setPointerCapture(e.pointerId);
+      canvasRef.current.style.cursor = "grabbing";
+      drawArgs.onDragChange(true);
+      return;
+    }
+
+    if (isLitCanvasMode(drawArgs.mode)) {
+      e.preventDefault();
+      dragState.current = { kind: "view", pointerId: e.pointerId, lastPoint: point };
+      canvasRef.current.setPointerCapture(e.pointerId);
+      canvasRef.current.style.cursor = "grabbing";
+    }
   };
 
   const handlePointerMove = (e) => {
@@ -180,6 +212,22 @@ export function PreviewArea({
     if (dragState.current.kind === "light") {
       e.preventDefault();
       onLightMove(point);
+      return;
+    }
+    if (dragState.current.kind === "view") {
+      e.preventDefault();
+      const rect = lastRectRef.current;
+      const last = dragState.current.lastPoint;
+      if (rect && last) {
+        const dx = (point.x - last.x) / rect.width;
+        const dy = (point.y - last.y) / rect.height;
+        const tilt = drawArgs.viewTilt ?? { x: 0, y: 0 };
+        onViewTilt({
+          x: clampTilt(tilt.x + dx * VIEW_TILT_SENSITIVITY),
+          y: clampTilt(tilt.y - dy * VIEW_TILT_SENSITIVITY),
+        });
+      }
+      dragState.current.lastPoint = point;
       return;
     }
     updateCursor(point);
@@ -196,7 +244,7 @@ export function PreviewArea({
     } else if (dragState.current.kind === "split") {
       drawArgs.onSplitDragChange(false);
     }
-    dragState.current = { kind: null, pointerId: null };
+    dragState.current = { kind: null, pointerId: null, lastPoint: null };
     updateCursor(eventPoint(e));
   };
 

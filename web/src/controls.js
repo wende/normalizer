@@ -83,15 +83,15 @@ export function buildSpecularParams(controls) {
   };
 }
 
-<<<<<<< HEAD
 // Parallax-map UI values. Contrast is a UI int 1-4000; buildParallaxParams
 // divides by 1000 to get the 0.001-4.0 float. Focus/soft/erode-dilate use
 // prettier UI defaults (3/10/0) than the shared/CLI defaults (2/3/1).
 // biselDistance/softBisel come from DEFAULT_PARALLAX_PARAMS (HeightMap's local
 // bevel-distance inputs) via the spread in buildParallaxParams — they have no
-// UI slider.
+// UI slider. previewParallaxDepth is lit-preview only (not map generation).
 export const DEFAULT_PARALLAX = {
-  parallaxType: "binary",
+  // Binary remains available via CLI; UI is HeightMap-only for now.
+  parallaxType: "heightmap",
   parallaxMax: 140,
   parallaxMin: 0,
   parallaxFocus: 3,
@@ -101,6 +101,7 @@ export const DEFAULT_PARALLAX = {
   parallaxContrast: 1000,
   parallaxInvert: false,
   useAlpha: false,
+  previewParallaxDepth: 30,
 };
 
 export function buildParallaxParams(controls) {
@@ -115,7 +116,10 @@ export function buildParallaxParams(controls) {
     parallaxBrightness: Number(controls.parallaxBrightness),
     parallaxContrast: Number(controls.parallaxContrast) / 1000,
     parallaxInvert: controls.parallaxInvert,
-=======
+    useAlpha: controls.useAlpha,
+  };
+}
+
 // Occlusion-map UI values. Contrast is a UI int 1-4000; buildOcclusionParams
 // divides by 1000 to get the 0.001-4.0 float the engine wants. Bright/blur UI
 // defaults (10) are prettier out-of-box; the shared/CLI defaults are 16/3.
@@ -139,7 +143,6 @@ export function buildOcclusionParams(controls) {
     occlusionDistanceMode: controls.occlusionDistanceMode,
     occlusionDistance: Number(controls.occlusionDistance),
     occlusionInvert: controls.occlusionInvert,
->>>>>>> add-occlusion-map
     useAlpha: controls.useAlpha,
   };
 }

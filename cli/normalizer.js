@@ -1,10 +1,6 @@
 #!/usr/bin/env node
 /*
-<<<<<<< HEAD
- * normalizer CLI — normal-, specular-, and parallax-map generation.
-=======
- * normalizer CLI — normal-, specular-, and occlusion-map generation.
->>>>>>> add-occlusion-map
+ * normalizer CLI — normal-, specular-, parallax-, and occlusion-map generation.
  *
  * Derived from Laigter's GPL-3.0 logic; mirrors the argument/exit contract of
  * core/tools/laigter_core_cli.cpp so scripts/run_core_cases.py can drive either
@@ -15,11 +11,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import pngjs from "pngjs";
 import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
 import { generateSpecularMap, DEFAULT_SPECULAR_PARAMS } from "../shared/specular.js";
-<<<<<<< HEAD
 import { generateParallaxMap, DEFAULT_PARALLAX_PARAMS } from "../shared/parallax.js";
-=======
 import { generateOcclusionMap, DEFAULT_OCCLUSION_PARAMS } from "../shared/occlusion.js";
->>>>>>> add-occlusion-map
 
 const { PNG } = pngjs;
 
@@ -29,11 +22,8 @@ const USAGE = [
   "commands:",
   "  normal                           generate a tangent-space normal map",
   "  specular                         generate a specular reflectivity map",
-<<<<<<< HEAD
   "  parallax                         generate a parallax (height) map",
-=======
   "  occlusion                        generate an ambient-occlusion map",
->>>>>>> add-occlusion-map
   "",
   "normal options:",
   "  --normal-depth <int>             emboss strength (default 250)",
@@ -55,7 +45,6 @@ const USAGE = [
   "  --specular-invert                invert the map",
   "  --use-specular-alpha             copy the source alpha into the output",
   "",
-<<<<<<< HEAD
   "parallax options:",
   "  --parallax-type <binary|heightmap>  type (default binary)",
   "  --parallax-max <int>             binary threshold / heightmap pivot (default 140)",
@@ -67,7 +56,7 @@ const USAGE = [
   "  --parallax-contrast <float>      heightmap contrast (default 1.0)",
   "  --parallax-invert                invert the map",
   "  --use-parallax-alpha             copy the source alpha into the output",
-=======
+  "",
   "occlusion options:",
   "  --occlusion-thresh <int>         threshold + contrast pivot (default 1)",
   "  --occlusion-contrast <float>     contrast (default 1.0)",
@@ -77,7 +66,6 @@ const USAGE = [
   "  --occlusion-distance <int>       distance falloff scale (default 10)",
   "  --occlusion-invert               invert the map",
   "  --use-occlusion-alpha            copy the source alpha into the output",
->>>>>>> add-occlusion-map
 ].join("\n");
 
 function failUsage(message) {
@@ -187,7 +175,6 @@ function parseSpecularFlags(args) {
   return params;
 }
 
-<<<<<<< HEAD
 function parseParallaxFlags(args) {
   const params = { ...DEFAULT_PARALLAX_PARAMS };
   for (let i = 3; i < args.length; i += 1) {
@@ -226,7 +213,15 @@ function parseParallaxFlags(args) {
         params.parallaxInvert = true;
         break;
       case "--use-parallax-alpha":
-=======
+        params.useAlpha = true;
+        break;
+      default:
+        fail(`unknown option: ${arg}`);
+    }
+  }
+  return params;
+}
+
 function parseOcclusionFlags(args) {
   const params = { ...DEFAULT_OCCLUSION_PARAMS };
   for (let i = 3; i < args.length; i += 1) {
@@ -254,7 +249,6 @@ function parseOcclusionFlags(args) {
         params.occlusionInvert = true;
         break;
       case "--use-occlusion-alpha":
->>>>>>> add-occlusion-map
         params.useAlpha = true;
         break;
       default:
@@ -264,15 +258,13 @@ function parseOcclusionFlags(args) {
   return params;
 }
 
-<<<<<<< HEAD
 const PARSERS = {
   normal: parseNormalFlags,
   specular: parseSpecularFlags,
   parallax: parseParallaxFlags,
+  occlusion: parseOcclusionFlags,
 };
 
-=======
->>>>>>> add-occlusion-map
 function parseArgs(args) {
   if (args.length === 0) {
     process.stdout.write(`${USAGE}\n`);
@@ -283,35 +275,22 @@ function parseArgs(args) {
     process.exit(0);
   }
   const command = args[0];
-<<<<<<< HEAD
   const parser = PARSERS[command];
   if (!parser) {
-=======
-  const parsers = {
-    normal: parseNormalFlags,
-    specular: parseSpecularFlags,
-    occlusion: parseOcclusionFlags,
-  };
-  if (!(command in parsers)) {
->>>>>>> add-occlusion-map
     fail(`unknown command: ${command}`);
   }
   if (args.length < 3) {
     failUsage("missing input/output arguments");
   }
 
-<<<<<<< HEAD
   return { command, inputPath: args[1], outputPath: args[2], params: parser(args) };
-=======
-  const params = parsers[command](args);
-  return { command, inputPath: args[1], outputPath: args[2], params };
->>>>>>> add-occlusion-map
 }
 
 const GENERATORS = {
   normal: generateNormalMap,
   specular: generateSpecularMap,
   parallax: generateParallaxMap,
+  occlusion: generateOcclusionMap,
 };
 
 const { command, inputPath, outputPath, params } = parseArgs(process.argv.slice(2));
@@ -327,16 +306,7 @@ const source = { width: inputPng.width, height: inputPng.height, data: inputPng.
 
 let out;
 try {
-<<<<<<< HEAD
   out = GENERATORS[command](source, params);
-=======
-  const generators = {
-    normal: generateNormalMap,
-    specular: generateSpecularMap,
-    occlusion: generateOcclusionMap,
-  };
-  out = generators[command](source, params);
->>>>>>> add-occlusion-map
 } catch (error) {
   fail(error.message);
 }
