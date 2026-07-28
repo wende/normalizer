@@ -9,6 +9,7 @@ import { generateSpecularMap } from "shared/specular.js";
 import { generateParallaxMap } from "shared/parallax.js";
 import { generateOcclusionMap } from "shared/occlusion.js";
 import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "shared/preview.js";
+import { flatPlaneUvOffset } from "./flatPlaneOffset.js";
 
 export function hexToRgb01(hex) {
   const value = hex.replace("#", "");
@@ -170,13 +171,25 @@ export function buildLightSettings(light, lightControls) {
 
 export { DEFAULT_LIGHT_PARAMS };
 
-function drawImageData(ctx, imageData, rect, pixelated) {
+function drawImageData(ctx, imageData, rect, pixelated, uvOffset = null) {
   const offscreen = document.createElement("canvas");
   offscreen.width = imageData.width;
   offscreen.height = imageData.height;
   offscreen.getContext("2d").putImageData(imageData, 0, 0);
   ctx.imageSmoothingEnabled = !pixelated;
-  ctx.drawImage(offscreen, rect.x, rect.y, rect.width, rect.height);
+  const ox = (uvOffset?.x ?? 0) * rect.width;
+  const oy = (uvOffset?.y ?? 0) * rect.height;
+  if (!ox && !oy) {
+    ctx.drawImage(offscreen, rect.x, rect.y, rect.width, rect.height);
+    return;
+  }
+  // uv' = uv + offset → content shifts opposite on screen; clip to fitted rect.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  ctx.clip();
+  ctx.drawImage(offscreen, rect.x - ox, rect.y - oy, rect.width, rect.height);
+  ctx.restore();
 }
 
 export function drawLightHandle(ctx, light, source, rect, dragging, lightSprite) {
@@ -241,6 +254,8 @@ export function drawPreview({
   draggingLight,
   lightSprite,
   splitRatio = 0.5,
+  viewTilt,
+  heightScale = 0,
 }) {
   const ratio = window.devicePixelRatio || 1;
   const bounds = canvas.getBoundingClientRect();
@@ -302,11 +317,21 @@ export function drawPreview({
     drawImageData(ctx, normal, rect, pixelated);
   } else {
     const splitX = splitDividerX(rect, splitRatio);
-    drawImageData(ctx, source, rect, pixelated);
+    const planeOffset = flatPlaneUvOffset(viewTilt, heightScale);
+    // Left: flat source panned as a rigid plane (matches WebGL split).
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, splitX - rect.x, rect.height);
+    ctx.clip();
+    drawImageData(ctx, source, rect, pixelated, planeOffset);
+    ctx.restore();
+    // Right: clear then lit (no flat pass underneath).
     ctx.save();
     ctx.beginPath();
     ctx.rect(splitX, rect.y, rect.x + rect.width - splitX, rect.height);
     ctx.clip();
+    ctx.fillStyle = "#2a2f2c";
+    ctx.fillRect(splitX, rect.y, rect.x + rect.width - splitX, rect.height);
     drawImageData(ctx, litCache || normal, rect, pixelated);
     ctx.restore();
     ctx.strokeStyle = "#fffefa";

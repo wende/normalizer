@@ -58,7 +58,7 @@ function drawOverlay(octx, canvas, drawArgs, rect) {
 function cpuFallback(overlay, octx, drawArgs) {
   const {
     source, normal, specular, parallax, occlusion, mode, pipeline, light, pixelated, draggingLight, lightSprite,
-    lightSettings, toon, splitRatio,
+    lightSettings, toon, splitRatio, viewTilt, heightScale,
   } = drawArgs;
   const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular) : null;
   return drawPreview({
@@ -78,6 +78,8 @@ function cpuFallback(overlay, octx, drawArgs) {
     draggingLight,
     lightSprite,
     splitRatio,
+    viewTilt,
+    heightScale,
   });
 }
 
