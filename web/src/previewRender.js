@@ -9,7 +9,6 @@ import { generateSpecularMap } from "shared/specular.js";
 import { generateParallaxMap } from "shared/parallax.js";
 import { generateOcclusionMap } from "shared/occlusion.js";
 import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "shared/preview.js";
-import { computeShadowProjection, shadowBand, shadowSoftnessTaps } from "./shadow.js";
 
 export function hexToRgb01(hex) {
   const value = hex.replace("#", "");
@@ -55,20 +54,6 @@ export function canvasToLight(point, source, rect) {
   };
 }
 
-export function shadowContactToCanvas(contact, source, rect) {
-  return {
-    x: rect.x + contact.x * rect.width,
-    y: rect.y + contact.y * rect.height,
-  };
-}
-
-export function canvasToShadowContact(point, rect) {
-  return {
-    x: Math.max(0, Math.min(1, (point.x - rect.x) / rect.width)),
-    y: Math.max(0, Math.min(1, (point.y - rect.y) / rect.height)),
-  };
-}
-
 export function canvasPointFromEvent(canvas, event) {
   const bounds = canvas.getBoundingClientRect();
   return {
@@ -87,13 +72,6 @@ export function pointHitsLight(point, light, source, rect) {
     point.y >= pos.y - half &&
     point.y <= pos.y + half
   );
-}
-
-export function pointHitsShadowContact(point, shadow, source, rect) {
-  if (!shadow?.enabled || !source || !rect) return false;
-  const pos = shadowContactToCanvas(shadow.contact, source, rect);
-  const radius = 13 * (window.devicePixelRatio || 1);
-  return Math.hypot(point.x - pos.x, point.y - pos.y) <= radius;
 }
 
 export function splitDividerX(rect, splitRatio = 0.5) {
@@ -201,69 +179,6 @@ function drawImageData(ctx, imageData, rect, pixelated) {
   ctx.drawImage(offscreen, rect.x, rect.y, rect.width, rect.height);
 }
 
-function createAlphaMask(source) {
-  const canvas = document.createElement("canvas");
-  canvas.width = source.width;
-  canvas.height = source.height;
-  const mask = new Uint8ClampedArray(source.width * source.height * 4);
-  for (let px = 0; px < source.data.length; px += 4) {
-    mask[px + 3] = source.data[px + 3];
-  }
-  canvas.getContext("2d").putImageData(new ImageData(mask, source.width, source.height), 0, 0);
-  return canvas;
-}
-
-// Canvas2D equivalent of the GPU shadow bands. This is a fallback only; the
-// WebGL renderer keeps the same geometry but avoids rebuilding an alpha mask.
-function drawAlphaShadow(ctx, source, rect, lightSettings, shadow) {
-  if (!shadow?.enabled || shadow.opacity <= 0) return;
-  const ratio = window.devicePixelRatio || 1;
-  const projection = computeShadowProjection(source, rect, lightSettings, shadow);
-  const taps = shadowSoftnessTaps(projection, shadow.softness * ratio);
-  const mask = createAlphaMask(source);
-
-  for (let i = 0; i < 16; i += 1) {
-    const band = shadowBand(projection, i);
-    const sourceStart = band.start * source.height;
-    const sourceHeight = (band.end - band.start) * source.height;
-    for (const tap of taps) {
-      const topLeft = {
-        x: rect.x + band.xStart + tap.x,
-        y: rect.y + band.start * rect.height + band.yStart + tap.y,
-      };
-      const bottomLeft = {
-        x: rect.x + band.xEnd + tap.x,
-        y: rect.y + band.end * rect.height + band.yEnd + tap.y,
-      };
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(topLeft.x, topLeft.y);
-      ctx.lineTo(topLeft.x + rect.width, topLeft.y);
-      ctx.lineTo(bottomLeft.x + rect.width, bottomLeft.y);
-      ctx.lineTo(bottomLeft.x, bottomLeft.y);
-      ctx.closePath();
-      ctx.clip();
-      ctx.globalAlpha = shadow.opacity / 100 * tap.weight;
-      // Source x maps directly to the preview width; source y is sheared
-      // between the strip's shared top and bottom shadow edges.
-      const scaleX = rect.width / source.width;
-      const shiftXPerSourceY = (band.xEnd - band.xStart) / sourceHeight;
-      const shiftYPerSourceY = (band.yEnd - band.yStart) / sourceHeight;
-      const scaleY = rect.height / source.height + shiftYPerSourceY;
-      ctx.setTransform(
-        scaleX,
-        0,
-        shiftXPerSourceY,
-        scaleY,
-        topLeft.x - shiftXPerSourceY * sourceStart,
-        topLeft.y - scaleY * sourceStart,
-      );
-      ctx.drawImage(mask, 0, 0);
-      ctx.restore();
-    }
-  }
-}
-
 export function drawLightHandle(ctx, light, source, rect, dragging, lightSprite) {
   const ratio = window.devicePixelRatio || 1;
   const pos = lightToCanvas(light, source, rect);
@@ -282,28 +197,6 @@ export function drawLightHandle(ctx, light, source, rect, dragging, lightSprite)
   ctx.lineWidth = Math.max(2, 2 * ratio);
   ctx.beginPath();
   ctx.arc(pos.x, pos.y, size * 0.48, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-export function drawShadowContactHandle(ctx, shadow, source, rect) {
-  if (!shadow?.enabled) return;
-  const ratio = window.devicePixelRatio || 1;
-  const pos = shadowContactToCanvas(shadow.contact, source, rect);
-  const radius = 8 * ratio;
-  ctx.save();
-  ctx.fillStyle = "rgba(32, 21, 3, 0.92)";
-  ctx.strokeStyle = "#ffd15c";
-  ctx.lineWidth = Math.max(1.5, 2 * ratio);
-  ctx.beginPath();
-  ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(pos.x - radius * 1.65, pos.y);
-  ctx.lineTo(pos.x + radius * 1.65, pos.y);
-  ctx.moveTo(pos.x, pos.y - radius * 1.65);
-  ctx.lineTo(pos.x, pos.y + radius * 1.65);
   ctx.stroke();
   ctx.restore();
 }
@@ -344,7 +237,6 @@ export function drawPreview({
   pipeline,
   light,
   lightSettings,
-  shadow,
   pixelated,
   draggingLight,
   lightSprite,
@@ -388,9 +280,6 @@ export function drawPreview({
   }
 
   const rect = fitRect(source.width, source.height, canvas.width - 48, canvas.height - 48);
-  if (mode === "lit") {
-    drawAlphaShadow(ctx, source, rect, lightSettings, shadow);
-  }
   if (mode === "base") {
     drawImageData(ctx, source, rect, pixelated);
   } else if (mode === "specular") {
@@ -420,9 +309,6 @@ export function drawPreview({
     ctx.stroke();
   }
   drawLightHandle(ctx, light, source, rect, draggingLight, lightSprite);
-  if (mode === "lit") {
-    drawShadowContactHandle(ctx, shadow, source, rect);
-  }
   return rect;
 }
 
