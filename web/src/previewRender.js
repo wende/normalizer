@@ -148,8 +148,8 @@ export function generateOcclusion(source, params) {
   return new ImageData(out.data, out.width, out.height);
 }
 
-export function renderLit(source, normal, lightSettings, toon, specular = null) {
-  const out = buildLitPreview(source, normal, lightSettings, toon, specular);
+export function renderLit(source, normal, lightSettings, toon, specular = null, occlusion = null) {
+  const out = buildLitPreview(source, normal, lightSettings, toon, specular, occlusion);
   return new ImageData(out.data, out.width, out.height);
 }
 
