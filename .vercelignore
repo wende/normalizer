@@ -1,0 +1,13 @@
+build/
+core/
+laigter/
+tests/
+experiments/
+docs/
+.claude/
+.playwright-cli/
+web/e2e/
+web/server.js
+web/playwright.config.js
+*.md
+!web/README.md

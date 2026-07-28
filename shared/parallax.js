@@ -9,8 +9,8 @@
  *
  * Only the two live upstream types are ported (Binary, HeightMap); the
  * Quantization/Intervals cases are empty stubs upstream and omitted per
- * NORMALIZER_FEATURES.md. Non-tileable + no overlay compositing, matching the
- * other ported maps (see PARALLAX_MAP_PLAN.md "Scope").
+ * docs/NORMALIZER_FEATURES.md. Non-tileable + no overlay compositing, matching the
+ * other ported maps (see docs/PARALLAX_MAP_PLAN.md "Scope").
  */
 
 import { grayscaleFromRgba } from "./image.js";
@@ -43,7 +43,7 @@ export const DEFAULT_PARALLAX_PARAMS = {
 /**
  * Bevel-distance buffer = upstream modify_distance() output (the same buffer
  * generateNormalMap computes internally). Recomputed locally here per the
- * PARALLAX_MAP_PLAN.md "Shared bevel distance" trap: sharing needs the §5.8
+ * docs/PARALLAX_MAP_PLAN.md "Shared bevel distance" trap: sharing needs the §5.8
  * cache hooks, and without them HeightMap re-runs the EDT regardless.
  */
 function computeBevelDistance(source, p) {

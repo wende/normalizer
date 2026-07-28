@@ -27,8 +27,17 @@ import {
 import { adjustNormalMap } from "./normalAdjust.js";
 
 const SAMPLE_SRC = "./demo.png";
+const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
 const LIGHT_SPRITE_SRC = "./laigter_texture.png";
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
+
+async function decodeImage(src) {
+  const image = new Image();
+  image.decoding = "async";
+  image.src = src;
+  await image.decode();
+  return image;
+}
 
 export function App() {
   const [source, setSource] = useState(null);
@@ -37,7 +46,7 @@ export function App() {
   const [parallaxMap, setParallaxMap] = useState(null);
   const [aiOverlay, setAiOverlay] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
-  const [pipeline, setPipeline] = useState("procedural"); // "procedural" | "ai"
+  const [pipeline, setPipeline] = useState("ai"); // "procedural" | "ai"
   const [mode, setMode] = useState("split"); // preview view
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [draggingSplit, setDraggingSplit] = useState(false);
@@ -232,21 +241,24 @@ export function App() {
     setLight((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
   }, [source]);
 
-  const loadFromImage = useCallback(async (image) => {
+  const loadFromImage = useCallback(async (image, { aiNormalImage = null } = {}) => {
     const data = readSourceFromImage(image);
     setSource(data);
-    setAiOverlay(null); // AI map is per-image; force a regenerate for the new one
+    // Sample ships a precomputed DeepBump map; uploads clear AI until regenerate.
+    setAiOverlay(aiNormalImage ? readSourceFromImage(aiNormalImage) : null);
+    if (aiNormalImage) setPipeline("ai");
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
   }, []);
 
   const loadSample = useCallback(async () => {
     setStatus("Loading sample");
     try {
-      const image = new Image();
-      image.decoding = "async";
-      image.src = SAMPLE_SRC;
-      await image.decode();
-      await loadFromImage(image);
+      const [image, aiNormalImage] = await Promise.all([
+        decodeImage(SAMPLE_SRC),
+        decodeImage(SAMPLE_AI_NORMAL_SRC),
+      ]);
+      await loadFromImage(image, { aiNormalImage });
+      setStatus(`${image.naturalWidth}x${image.naturalHeight} - sample ready`);
     } catch (error) {
       setStatus(error.message || SAMPLE_LOAD_ERROR);
     }

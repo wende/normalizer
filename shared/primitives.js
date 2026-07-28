@@ -2,7 +2,7 @@
 //
 // Pure functions over typed arrays / plain { width, height, data } records —
 // no DOM, no Node APIs. These are the JS equivalents of the CImg operations
-// the upstream generators use (see JS_CORE_MIGRATION.md §3).
+// the upstream generators use (see docs/JS_CORE_MIGRATION.md §3).
 
 import { rgbaOffset } from "./image.js";
 
@@ -21,14 +21,11 @@ export function edt1d(f, n) {
   z[1] = Infinity;
 
   for (let q = 1; q < n; q += 1) {
-    let s = 0;
-    do {
-      const vk = v[k];
-      s = ((f[q] + q * q) - (f[vk] + vk * vk)) / (2 * q - 2 * vk);
-      if (s <= z[k]) {
-        k -= 1;
-      }
-    } while (s <= z[k]);
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) {
+      k -= 1;
+      s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    }
     k += 1;
     v[k] = q;
     z[k] = s;
@@ -97,7 +94,7 @@ export function alphaDistance(image) {
  * Separable finite-kernel Gaussian blur of a single-channel Float32Array.
  * sigma = radius / 3, truncated at 3*sigma. A radius yielding sigma <= 0.01
  * returns a copy unchanged. (Diverges slightly from CImg's recursive IIR blur
- * near borders / large sigma — see JS_CORE_MIGRATION.md §5.1.)
+ * near borders / large sigma — see docs/JS_CORE_MIGRATION.md §5.1.)
  */
 export function gaussianBlur(input, width, height, radius) {
   const sigma = radius / 3;
@@ -158,7 +155,7 @@ export function smoothstep(edge0, edge1, value) {
  *
  * Block-aligned forward (fwd) and backward (bwd) running op: any radius-r
  * window [i, i+2r] is covered by bwd[i] (i→block end) ∪ fwd[i+2r] (block
- * start→i+2r). See JS_CORE_MIGRATION.md §5.3.
+ * start→i+2r). See docs/JS_CORE_MIGRATION.md §5.3.
  */
 function morph1D(src, L, r, op) {
   if (r <= 0) return new Float32Array(src);

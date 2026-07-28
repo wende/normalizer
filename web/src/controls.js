@@ -29,7 +29,7 @@ export const DEFAULT_LIGHT_CONTROLS = {
   specularScatter: 32,
   ambientIntensity: 80,
   ambientColor: "#ffffff",
-  lightColor: "#00ffb3",
+  lightColor: "#fff2b3",
   lightHeight: 30,
 };
 

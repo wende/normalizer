@@ -29,4 +29,6 @@ experiments/**/*.png
 
 # build output & transient tool logs
 web/dist/
+.vercel/
 .playwright-cli/
+.vercel

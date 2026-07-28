@@ -44,13 +44,17 @@ Status verified 2026-07-07 against git history and tree.
 1. ✅ ~~**Shared algorithm module + Node CLI skeleton**~~ — DONE
    (`6e2414a`, `b5b9dee`). `shared/` holds `image.js`, `normal.js`,
    `primitives.js`, `preview.js`; `cli/normalizer.js` is the Node CLI.
-2. ❌ **Parallax map generation + panel** — NOT STARTED. No parallax code in
-   `shared/` or `cli/`; only `normal` map exists.
-3. ❌ **Specular map generation + panel** — NOT STARTED. `specular*` refs in
-   `web/src/` are preview-lighting params, not map generation.
-4. ❌ **Occlusion map generation + panel** — NOT STARTED.
+2. ✅ ~~**Parallax map generation + panel**~~ — DONE (`ef44eaf`).
+   `shared/parallax.js` (Binary + HeightMap), `cli/normalizer.js parallax`
+   subcommand, web Parallax panel + preview tab, `tests/parallax.test.js`.
+3. ✅ ~~**Specular map generation + panel**~~ — DONE (`8bcd80f`, `23fc05a`).
+   `shared/specular.js`, `cli/normalizer.js specular` subcommand, web
+   Specular panel + preview tab, `tests/specular.test.js`.
+4. ❌ **Occlusion map generation + panel** — NOT STARTED. Plan written in
+   `OCCLUSION_MAP_PLAN.md`; no `shared/occlusion.js` yet.
 5. ❌ **Export with suffix convention** — NOT STARTED. CLI takes a single
-   explicit output path; no `_n/_p/_s/_o` logic anywhere.
+   explicit output path; no `_n/_p/_s/_o` logic anywhere. Web export uses
+   `laigter-<map>.png` filenames instead (`App.jsx`).
 6. ❌ **Tileable 3×3 neighbour mosaics** — NOT STARTED. No tileX/tileY,
    mosaic, or center-crop code. (Original intent: compute on mosaic, crop
    center, per REWRITE_PLAN.md §1 "Tileability"; plain self-tiling first,
@@ -59,8 +63,8 @@ Status verified 2026-07-07 against git history and tree.
    `h_frames`/`v_frames`/frame-list/fps code (the only "sprite"/"frame" hits
    in `web/` are the preview light sprite and a code comment).
 8. ❌ **Node CLI batch export** — NOT STARTED. `cli/normalizer.js` is
-   single-input/single-output, `normal` subcommand only; no folder scan,
-   suffixes, recursion, or `--check-changes`.
+   single-input/single-output, `normal`/`specular`/`parallax` subcommands
+   only; no folder scan, suffixes, recursion, or `--check-changes`.
 
 ## 2. Implement cheaply alongside (hygiene, not features)
 
@@ -69,32 +73,37 @@ Status verified 2026-07-07 against git history and tree.
   existing debounce, not the per-map worker pool from REWRITE_PLAN.md §3
   Phase 3.3. Occlusion's distance transform and large blurs will jank the
   main thread otherwise. Add the pool only if it ever hurts.)
-- ❌ **Self-regression goldens** — NOT STARTED; harness is still upstream-parity.
-  `tests/golden/manifest.json` describes itself as "validating the Laigter
-  rewrite against upstream Laigter"; `tests/golden/README.md` says `make
-  golden` "compares … against `tests/golden/upstream/`"; `upstream/` PNGs are
-  still checked in. Pin our own CLI output as expected PNGs instead.
+- 🟡 **Self-regression goldens** — PARTIAL. `make js-smoke` and
+  `make preview-self-check` run the JS CLI and compare Node output against
+  itself, but `tests/golden/manifest.json` still describes itself as
+  "validating the Laigter rewrite against upstream Laigter" and the upstream
+  PNGs are still checked in as the primary target for `make golden`. The
+  full conversion (drop upstream comparison, keep only self-regression) is
+  not done.
+- 🟡 **Unit tests wired into npm** — PARTIAL. `npm test` runs
+  `tests/specular.test.js` and `tests/parallax.test.js`; there is no single
+  command that also runs `make js-smoke` / `make preview-self-check`.
 
 ## 3. Defer (real value, wrong time — with re-entry triggers)
 
 | Item | Plan ref | Trigger to revisit | Status (2026-07-07) |
 |---|---|---|---|
 | React + TS + Vite shell | §3 Phase 3.1 | Vanilla UI state handling starts fighting us (~4 more panels will roughly triple `app.js`). Cheap middle step available now: convert the shared module to TypeScript. | 🟡 Partial — Preact + Vite + JSX shell landed (`cd8084d` "Rewrite web UI in Preact"; `web/src/*.jsx`). Not React, not TS. |
-| WebGL2 port of `fshader.glsl` + full lights/ambient/specular/parallax preview | §3 Phase 3.2, §2 "Preview-only" | When parallax generation lands — a parallax map you can't preview is hard to tune. | 🟡 Partial — Canvas2D lit preview with specular/scatter light controls shipped (`b5b9dee`, `0a94e62`, `d4e9030`; `shared/preview.js`, `web/src/previewRender.js`). Not WebGL2; no ambient/parallax preview. |
-| Custom heightmap / specular base inputs (UI) | §2 "Inputs" | User demand. Generation code keeps accepting an optional height/specular source so only UI is missing. | ❌ Still deferred (no UI; `generateNormalMap` takes no height/spec source yet). |
-| Paint overlays in UI | §3 "Deliberately deferred" | Same: core keeps accepting overlay buffers (already the upstream plan's stance). | ❌ Still deferred. |
+| WebGL2 port of `fshader.glsl` + full lights/ambient/specular/parallax preview | §3 Phase 3.2, §2 "Preview-only" | When parallax generation lands — a parallax map you can't preview is hard to tune. | 🟡 Partial — Canvas2D lit preview with specular/scatter light controls shipped (`b5b9dee`, `0a94e62`, `d4e9030`; `shared/preview.js`, `web/src/previewRender.js`). `web/src/litGL.js` is a WebGL2 lit preview that uses the specular map; parallax preview is a raw-map tab, not displacement-mapped lighting. |
+| Custom heightmap / specular base inputs (UI) | §2 "Inputs" | User demand. Generation code keeps accepting an optional height/specular source so only UI is missing. | 🟡 Partial — `generateSpecularMap(source, p, specularBase = source)` and `generateParallaxMap(source, p, height = source, bevelDistance = null)` accept optional sources; no UI loaders exist. `generateNormalMap` still takes no height/spec source. |
+| Paint overlays in UI | §3 "Deliberately deferred" | Same: core keeps accepting overlay buffers (already the upstream plan's stance). | ❌ Still deferred. `blendNormalOverlay` exists in `previewRender.js` for the AI normal, but there is no paint overlay input. |
 | Tauri desktop packaging | §3 Phase 3.1 | Only if folder-watch or distribution to non-terminal users becomes a goal; Node CLI covers batch until then. | ❌ Still deferred. |
 | Performance budget validation | §3 Phase 4.3 | Don't formalize; log recompute time in dev, look at it as each map lands. | ❌ Still deferred (no recompute-time logging in `web/`). |
 | New project zip format | §3 Phase 3.6 | Project firms up into a product. Until then: JSON settings export alongside PNGs. | ❌ Still deferred. |
 
 ## 4. Drop (invalidated by the decisions above)
 
-- 🟡 **Upstream golden corpus / pixel-diff parity** — DECLARED but NOT
-  EXECUTED. `tests/golden/upstream/` is still checked in and is still the
-  diff target per `tests/golden/README.md` and the manifest description; the
-  "free to diverge" non-goal has not been acted on. The harness is meant to
-  survive only in its self-regression role (§2 above), which itself is
-  unstarted.
+- 🟡 **Upstream golden corpus / pixel-diff parity** — DECLARED but only
+  PARTIALLY EXECUTED. `tests/golden/upstream/` is still checked in and
+  `make golden` still compares C++ output against it, but the JS CLI is
+  already validated only against itself (`make js-smoke`,
+  `make preview-self-check`). The harness is meant to survive only in its
+  self-regression role (§2 above); the full switch is unstarted.
 - ✅ ~~**WASM build, TS wrapper, Node WASM smoke test, WASM/core CI parity**~~
   — DROPPED. No Emscripten/WASM/`.ts` anywhere in the tree; decision held.
 - ✅ ~~**Legacy preset import** and **`.laigter` project import**~~ — DROPPED.
@@ -122,3 +131,8 @@ present. Consistent with the escape hatch: still reclaimable.
   Smooth / Steps (live) and Denoise / Overlap (regenerate). The model can be
   self-hosted by dropping `deepbump256.onnx` next to the worker and editing
   `DEFAULT_MODEL_URL`. Scope is normal maps only — no specular/roughness/AO.
+- **Invert X/Y/Z is CLI-only by design** — the shared normal generator and
+  the CLI support channel inversion, but the web UI deliberately does not
+  expose it. These are pipeline-correction flags for CLI/batch use; in the
+  browser the user can flip the source image instead. Documented here so it
+  is not mistaken for an unfinished feature.

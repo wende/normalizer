@@ -39,7 +39,7 @@ export function generateSpecularMap(source, p, specularBase = source) {
   // transparent-but-colored pixel reads as its luminance. grayscaleFromRgba
   // instead zeros fully-transparent pixels (→ 0 reflectivity). We prefer the
   // latter (transparent regions shouldn't reflect) per the self-regression
-  // direction in NORMALIZER_FEATURES.md — do not "restore parity" here.
+  // direction in docs/NORMALIZER_FEATURES.md — do not "restore parity" here.
   const gray = grayscaleFromRgba(specularBase);
   const contrast = p.specularContrast;
   const pivot = p.specularThresh * (1 - contrast);
@@ -54,7 +54,7 @@ export function generateSpecularMap(source, p, specularBase = source) {
 
   // gaussianBlur takes a radius and derives sigma = radius/3; upstream passes
   // specularBlur directly as sigma, so multiply by 3 to match. See
-  // JS_CORE_MIGRATION.md §5.1.
+  // docs/JS_CORE_MIGRATION.md §5.1.
   const blurred = p.specularBlur > 0 ? gaussianBlur(out, width, height, 3 * p.specularBlur) : out;
 
   const data = new Uint8ClampedArray(width * height * 4);

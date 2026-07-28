@@ -23,9 +23,12 @@ just adds static-file convenience (and a `text/javascript` content type for
 `/web/…` paths).
 
 The page loads the bundled sample image by default, accepts uploaded images,
-generates a normal map in Canvas, updates on slider changes with a 40 ms
-debounce, includes the upstream Pixelated/Toon render toggles, and exports the
-normal map as PNG. No server-side processing is required for any of it.
+and generates normal, specular, and parallax maps. The preview tab bar has
+six modes — Base, Split, Lit, Normal, Specular, Parallax — and each map
+updates on slider changes with a 40 ms debounce. The Light tab includes the
+upstream Pixelated/Toon render toggles; the toolbar exports the currently
+visible map as `laigter-<map>.png`. No server-side processing is required
+for any of it.
 
 ## AI normal generator (DeepBump, in the browser)
 
@@ -69,9 +72,12 @@ regenerate to take effect):
 | Strength | Adjust | %; 100 = as generated, 0 = flat, higher = deeper relief |
 | Smooth | Adjust | post-blur radius in px; 0 = off |
 | Steps | Adjust | normal-direction quantization for pixel-art facets; 0 = off |
-| Invert X / Y / Z | (Normal tab) | channel inversion, applied to both pipelines |
 | Denoise | Generation | edge-preserving pre-filter radius (px); 0 = off |
 | Overlap | Generation | tile overlap: Small / Medium / Large (larger = smoother seams, slower) |
+
+Channel inversion (Invert X/Y/Z) is intentionally **not** exposed in the web
+UI. The CLI supports it for pipeline correction; in the browser you can flip
+the source image instead.
 
 A **Generate AI Normal** / **Regenerate AI Normal** button (visible in both
 the Light and AI tabs while the AI pipeline is selected) kicks off a fresh
@@ -80,5 +86,6 @@ inference pass.
 ### Scope
 
 DeepBump produces **normal maps only**. It does not generate specular,
-roughness, metallic, AO, or full PBR material maps. If you need those, the
-Procedural pipeline (the Laigter-derived normal generator) is unaffected.
+roughness, metallic, AO, or full PBR material maps. Specular and parallax
+maps are generated procedurally from the diffuse (see the Specular and
+Parallax tabs).
