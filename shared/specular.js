@@ -9,7 +9,7 @@
 
 import { grayscaleFromRgba } from "./image.js";
 import { gaussianBlur } from "./primitives.js";
-import { downsampleRgba, normalizePixelSize, upsampleNearest } from "./pixelScale.js";
+import { downsampleRgba, normalizePixelSize, toArtUnits, upsampleNearest } from "./pixelScale.js";
 
 /**
  * Default specular-map parameters. Mirrors the CLI defaults so both share one
@@ -40,7 +40,15 @@ export function generateSpecularMap(source, p, specularBase = source) {
   if (scale > 1) {
     const lowSrc = downsampleRgba(source, scale);
     const lowBase = specularBase === source ? lowSrc : downsampleRgba(specularBase, scale);
-    const out = generateSpecularMap(lowSrc, { ...p, pixelSize: 1 }, lowBase);
+    const out = generateSpecularMap(
+      lowSrc,
+      {
+        ...p,
+        pixelSize: 1,
+        specularBlur: toArtUnits(p.specularBlur, scale),
+      },
+      lowBase,
+    );
     return upsampleNearest(out, source.width, source.height, scale);
   }
 

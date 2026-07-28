@@ -19,6 +19,7 @@ import {
   downsampleFloat,
   downsampleRgba,
   normalizePixelSize,
+  toArtUnits,
   upsampleNearest,
 } from "./pixelScale.js";
 
@@ -88,7 +89,19 @@ export function generateParallaxMap(source, p, height = source, bevelDistance = 
     const lowBevel = bevelDistance
       ? downsampleFloat(bevelDistance, source.width, source.height, scale)
       : null;
-    const out = generateParallaxMap(lowSrc, { ...p, pixelSize: 1 }, lowHeight, lowBevel);
+    const out = generateParallaxMap(
+      lowSrc,
+      {
+        ...p,
+        pixelSize: 1,
+        parallaxFocus: toArtUnits(p.parallaxFocus, scale),
+        parallaxSoft: toArtUnits(p.parallaxSoft, scale),
+        parallaxErodeDilate: toArtUnits(p.parallaxErodeDilate, scale),
+        biselDistance: toArtUnits(p.biselDistance, scale),
+      },
+      lowHeight,
+      lowBevel,
+    );
     return upsampleNearest(out, source.width, source.height, scale);
   }
 

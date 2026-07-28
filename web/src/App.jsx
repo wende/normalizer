@@ -256,7 +256,7 @@ export function App() {
     splitRatio,
     lightSettings: buildLightSettings(light, lightControls),
     toon: lightControls.toon,
-    pixelated: lightControls.pixelated,
+    pixelated: lightControls.pixelated || lightControls.pixelSize > 1,
     draggingLight: draggingLight.current,
     draggingSplit,
     lightSprite: lightSprite.current,

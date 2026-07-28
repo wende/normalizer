@@ -9,7 +9,7 @@
 
 import { grayscaleFromRgba } from "./image.js";
 import { alphaDistance, gaussianBlur } from "./primitives.js";
-import { atPixelScale, normalizePixelSize } from "./pixelScale.js";
+import { atPixelScale, normalizePixelSize, toArtUnits } from "./pixelScale.js";
 
 /**
  * Default normal-map parameters. Mirrors core/include/laigter_core.h so the CLI
@@ -94,8 +94,19 @@ export function calculateNormal(height, alpha, width, heightPx, depth, blurRadiu
 export function generateNormalMap(source, p) {
   const scale = normalizePixelSize(p?.pixelSize);
   if (scale > 1) {
+    // Soft/distance stay in screen pixels: divide into art units so raising
+    // pixelSize sharpens facets instead of multiplying blur.
     return atPixelScale(source, scale, (low) =>
-      generateNormalMap(low, { ...p, pixelSize: 1 }),
+      generateNormalMap(low, {
+        ...p,
+        pixelSize: 1,
+        normalBlurRadius: toArtUnits(p.normalBlurRadius, scale),
+        biselBlurRadius: toArtUnits(p.biselBlurRadius, scale),
+        biselDistance: toArtUnits(p.biselDistance, scale),
+        // Upstream depth uses biselDepth * biselDistance; keep that product
+        // screen-equivalent after shrinking biselDistance into art units.
+        biselDepth: (Number(p.biselDepth) || 0) * scale,
+      }),
     );
   }
 

@@ -128,19 +128,50 @@ check("pixelSize=1 leaves generateNormalMap size unchanged", () => {
 
 check("pixelSize>1 yields block-constant normals (art-scale blur)", () => {
   // Soft blur at screen resolution would smear inside each 4×4 block. With
-  // pixelSize=4 the blur runs on the 2×2 logical image, then nearest-upscales,
-  // so every physical pixel inside a block shares one normal.
+  // pixelSize=4 the blur runs on the 2×2 logical image (radius scaled into art
+  // units), then nearest-upscales, so every physical pixel inside a block
+  // shares one normal.
   const src = makeUpscaledChecker(4);
   const out = generateNormalMap(src, {
     ...DEFAULT_NORMAL_PARAMS,
     pixelSize: 4,
-    normalBlurRadius: 1,
-    biselBlurRadius: 1,
-    biselDistance: 2,
+    normalBlurRadius: 4,
+    biselBlurRadius: 4,
+    biselDistance: 8,
   });
   assert.equal(out.width, 8);
   assert.equal(out.height, 8);
   assert.equal(blocksAreUniform(out, 4, 0), true);
+});
+
+check("raising pixelSize does not multiply Soft into mush", () => {
+  // Same Soft with a larger pixelSize must stay closer to the pixelSize=1
+  // result than an unscaled (art-unit) Soft would. Unscaled Soft=8 at
+  // pixelSize=4 would flatten the 2×2 logical image; scaled Soft stays useful.
+  const src = makeUpscaledChecker(4);
+  const base = generateNormalMap(src, {
+    ...DEFAULT_NORMAL_PARAMS,
+    pixelSize: 1,
+    normalBlurRadius: 0,
+    biselBlurRadius: 0,
+    biselDistance: 0,
+    biselDepth: 0,
+  });
+  const scaled = generateNormalMap(src, {
+    ...DEFAULT_NORMAL_PARAMS,
+    pixelSize: 4,
+    normalBlurRadius: 8,
+    biselBlurRadius: 8,
+    biselDistance: 0,
+    biselDepth: 0,
+  });
+  // Block centers should still differ between the two checkerboard colors —
+  // not collapsed to one flat normal by an over-scaled blur.
+  const c0 = scaled.data.slice(0, 3);
+  const c1 = scaled.data.slice((0 * 8 + 4) * 4, (0 * 8 + 4) * 4 + 3);
+  assert.notDeepEqual([...c0], [...c1]);
+  assert.equal(blocksAreUniform(scaled, 4, 0), true);
+  assert.equal(base.width, scaled.width);
 });
 
 check("without pixelSize, soft blur breaks block uniformity", () => {

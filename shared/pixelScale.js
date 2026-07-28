@@ -15,6 +15,19 @@ export function normalizePixelSize(value) {
 }
 
 /**
+ * Convert a screen-pixel spatial radius/distance into art-pixel units for
+ * processing at logical resolution. Soft=6 with pixelSize=4 → art radius 1.5,
+ * so screen-space softness stays comparable instead of exploding with scale.
+ */
+export function toArtUnits(screenValue, pixelSize) {
+  const s = normalizePixelSize(pixelSize);
+  const v = Number(screenValue);
+  if (!Number.isFinite(v)) return 0;
+  if (s <= 1) return v;
+  return v / s;
+}
+
+/**
  * Downsample an RGBA image by averaging each pixelSize×pixelSize block into one
  * logical pixel. Truncates any remainder strip when width/height are not
  * divisible by pixelSize (those edge pixels are filled from the last logical

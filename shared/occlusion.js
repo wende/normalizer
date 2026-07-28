@@ -9,7 +9,7 @@
 
 import { grayscaleFromRgba } from "./image.js";
 import { distanceTransform, gaussianBlur } from "./primitives.js";
-import { downsampleRgba, normalizePixelSize, upsampleNearest } from "./pixelScale.js";
+import { downsampleRgba, normalizePixelSize, toArtUnits, upsampleNearest } from "./pixelScale.js";
 
 /**
  * Default occlusion-map parameters. Mirrors the CLI defaults so both share one
@@ -53,7 +53,16 @@ export function generateOcclusionMap(source, p, heightSource = source) {
   if (scale > 1) {
     const lowSrc = downsampleRgba(source, scale);
     const lowHeight = heightSource === source ? lowSrc : downsampleRgba(heightSource, scale);
-    const out = generateOcclusionMap(lowSrc, { ...p, pixelSize: 1 }, lowHeight);
+    const out = generateOcclusionMap(
+      lowSrc,
+      {
+        ...p,
+        pixelSize: 1,
+        occlusionBlur: toArtUnits(p.occlusionBlur, scale),
+        occlusionDistance: toArtUnits(p.occlusionDistance, scale),
+      },
+      lowHeight,
+    );
     return upsampleNearest(out, source.width, source.height, scale);
   }
 

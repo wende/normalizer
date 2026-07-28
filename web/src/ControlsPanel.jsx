@@ -121,7 +121,7 @@ export function ControlsPanel({
             })}
             format={(v) => (v <= 1 ? "1 (off)" : `${v}×`)}
           />
-          <p class="hint">Auto-detected on load from solid-color runs; override if needed. Turns on Pixelated preview when &gt; 1.</p>
+          <p class="hint">Auto-detected on load. Soft/Blur stay in screen pixels; larger size = chunkier facets, not more blur.</p>
         </ControlCard>
 
         <ControlCard title="Diffuse">
