@@ -18,13 +18,13 @@ import {
   buildLightSettings,
   drawPreview,
   exportPng,
-  generateNormal,
   generateSpecular,
   generateParallax,
   readSourceFromImage,
   canvasToLight,
 } from "./previewRender.js";
 import { adjustNormalMap } from "./normalAdjust.js";
+import { useNormalWorker } from "./useNormalWorker.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
@@ -174,15 +174,25 @@ export function App() {
   }, []);
 
   // Procedural normal — recomputed (debounced) from the source + normal sliders.
-  // Pure analytic; the AI map is kept entirely separate.
+  // The expensive EDT + blurs run in a Web Worker (normal.worker.js) so slider
+  // drags never block the UI thread; the AI map is kept entirely separate.
+  const { request: requestNormal } = useNormalWorker();
   useEffect(() => {
     if (!source) return;
     clearTimeout(generateTimer.current);
     generateTimer.current = setTimeout(() => {
-      const start = performance.now();
       const params = buildNormalParams(normalControls);
-      setProceduralNormal(generateNormal(source, params));
-      setStatus(`${source.width}x${source.height} - ${Math.round(performance.now() - start)} ms`);
+      requestNormal(
+        { width: source.width, height: source.height, data: source.data },
+        params,
+      ).then((res) => {
+        if (!res.ok) {
+          setStatus(`normal error: ${res.error}`);
+          return;
+        }
+        setProceduralNormal(new ImageData(new Uint8ClampedArray(res.data), res.width, res.height));
+        setStatus(`${source.width}x${source.height} - ${Math.round(res.ms)} ms`);
+      });
     }, 40);
     return () => clearTimeout(generateTimer.current);
   }, [source, normalControls]);
