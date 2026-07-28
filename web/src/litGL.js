@@ -5,6 +5,11 @@
  * previewRender.js has no parallax). The fragment shader mirrors the per-pixel
  * math of buildLitPreview in shared/preview.js for the non-parallax path.
  *
+ * Split mode draws the flat diffuse on the left (UV-panned as a rigid plane
+ * under the same view tilt / preview depth) and lit+parallax on the right,
+ * clearing the right scissor before the lit pass so OOB parallax samples do
+ * not leak the flat pass underneath.
+ *
  * Why this exists: the JS loop in buildLitPreview is O(W·H) on every light
  * move. On the GPU the light is a uniform, so dragging is resolution-
  * independent. Source/normal textures are re-uploaded only when their
@@ -15,6 +20,7 @@
 
 import { buildLitPreview } from "shared/preview.js";
 import { fitRect } from "./previewRender.js";
+import { flatPlaneUvOffset } from "./flatPlaneOffset.js";
 
 const VERT = `#version 300 es
 in vec2 aPos;   // destination pixel coords, y-down (canvas space)
@@ -47,6 +53,7 @@ uniform float uHeightScale;
 uniform vec2 uViewTilt;
 uniform vec3 uAmbientColor;  uniform float uAmbientIntensity;
 uniform int uToon;
+uniform vec2 uUvOffset;     // rigid UV pan (split flat side / flat-plane compare)
 
 vec2 parallaxMapping(vec2 texCoords, vec3 viewDir) {
   const float minLayers = 10.0;
@@ -75,14 +82,14 @@ vec2 parallaxMapping(vec2 texCoords, vec3 viewDir) {
 }
 
 void main() {
-  vec2 uv = vUV;
+  vec2 uv = vUV + uUvOffset;
   if (uMode == 1 && uHasParallax != 0 && uHeightScale > 0.0) {
     vec3 viewDir = normalize(vec3(uViewTilt.x, uViewTilt.y, 1.0));
-    uv = parallaxMapping(uv, viewDir);
-    if (uv.x > 1.0 || uv.y > 1.0 || uv.x < 0.0 || uv.y < 0.0) {
-      frag = vec4(0.0);
-      return;
-    }
+    uv = parallaxMapping(vUV, viewDir);
+  }
+  if (uv.x > 1.0 || uv.y > 1.0 || uv.x < 0.0 || uv.y < 0.0) {
+    frag = vec4(0.0);
+    return;
   }
   vec4 tex = texture(uTex, uv);
   if (uMode == 0) { frag = tex; return; }
@@ -139,7 +146,7 @@ export function createLitGL(canvas) {
     "uCanvasSize", "uMode", "uTex", "uNormal", "uParallax", "uResolution", "uLightPos",
     "uDiffuseColor", "uDiffuseIntensity", "uSpecularColor", "uSpecularIntensity",
     "uSpecularScatter", "uSpecularMap", "uHasSpecularMap", "uHasParallax", "uHeightScale",
-    "uViewTilt", "uAmbientColor", "uAmbientIntensity", "uToon",
+    "uViewTilt", "uAmbientColor", "uAmbientIntensity", "uToon", "uUvOffset",
   ]) {
     loc[name] = gl.getUniformLocation(prog, name);
   }
@@ -190,11 +197,12 @@ export function createLitGL(canvas) {
     gl.bufferData(gl.ARRAY_BUFFER, verts, gl.DYNAMIC_DRAW);
   }
 
-  function drawPassthrough(key, image, pixelated) {
+  function drawPassthrough(key, image, pixelated, uvOffset = null) {
     upload(key, image, pixelated);
     bindUnit(0, tex[key]);
     gl.uniform1i(loc.uTex, 0);
     gl.uniform1i(loc.uMode, 0);
+    gl.uniform2f(loc.uUvOffset, uvOffset?.x ?? 0, uvOffset?.y ?? 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
@@ -223,6 +231,7 @@ export function createLitGL(canvas) {
     }
     gl.uniform1f(loc.uHeightScale, heightScale ?? 0);
     gl.uniform2f(loc.uViewTilt, viewTilt?.x ?? 0, viewTilt?.y ?? 0);
+    gl.uniform2f(loc.uUvOffset, 0, 0);
     gl.uniform1i(loc.uMode, 1);
     gl.uniform2f(loc.uResolution, source.width, source.height);
     gl.uniform3f(loc.uLightPos, settings.x, settings.y, settings.z * 1000);
@@ -289,10 +298,16 @@ export function createLitGL(canvas) {
     } else if (mode === "lit") {
       drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale);
     } else {
-      drawPassthrough("source", source, pixelated);
+      // Split: left = flat source panned as a rigid plane under the same tilt /
+      // depth as parallax; right = lit + steep parallax. Clear the right scissor
+      // before the lit pass so transparent OOB / soft-alpha parallax samples do
+      // not composite over the flat pass (ghost "flat render below").
+      const planeOffset = flatPlaneUvOffset(viewTilt, heightScale);
+      drawPassthrough("source", source, pixelated, planeOffset);
       const splitPx = Math.round(rect.width * splitRatio);
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(rect.x + splitPx, ch - rect.y - rect.height, rect.width - splitPx, rect.height);
+      gl.clear(gl.COLOR_BUFFER_BIT);
       drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale);
       gl.disable(gl.SCISSOR_TEST);
     }
