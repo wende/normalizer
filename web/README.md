@@ -23,12 +23,16 @@ just adds static-file convenience (and a `text/javascript` content type for
 `/web/…` paths).
 
 The page loads the bundled sample image by default, accepts uploaded images,
-and generates normal, specular, and parallax maps. The preview tab bar has
-six modes — Base, Split, Lit, Normal, Specular, Parallax — and each map
-updates on slider changes with a 40 ms debounce. The Light tab includes the
-upstream Pixelated/Toon render toggles; the toolbar exports the currently
-visible map as `normalizer-<map>.png`. No server-side processing is required
-for any of it.
+and generates normal, specular, parallax, and occlusion maps. The preview tab
+bar has seven modes — Base, Split, Lit, Normal, Specular, Parallax, Occlusion —
+and each map updates on slider changes with a 40 ms debounce. The Light tab
+includes the upstream Pixelated/Toon render toggles.
+
+**Export PNG** downloads the currently visible map using the suffix convention
+(`{name}_normal.png`, `{name}_height.png` for parallax, `{name}_ao.png`, …).
+**Export Pack** downloads a ZIP folder with every map plus `normalizer.json`
+(engine-facing material manifest — no Godot/Unity assets yet). No server-side
+processing is required for any of it.
 
 ## AI normal generator (DeepBump, in the browser)
 

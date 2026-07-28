@@ -204,6 +204,22 @@ button:hover,
   filter: brightness(1.05);
 }
 
+#exportPackButton {
+  padding: 9px 14px;
+  border: 1px solid var(--button-border);
+  background: #ffffff;
+  font-weight: 600;
+}
+
+#exportPackButton:hover:not(:disabled) {
+  border-color: oklch(0.75 0.01 90);
+}
+
+#exportPackButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 /* Preview tab bar */
 .preview-tab-bar {
   display: flex;
@@ -515,6 +531,10 @@ button:hover,
 
   #exportButton {
     padding: 8px 14px;
+  }
+
+  #exportPackButton {
+    padding: 8px 12px;
   }
 
   .preview-tab-bar {

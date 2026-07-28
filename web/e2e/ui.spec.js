@@ -22,14 +22,15 @@ test.describe("Normal Map Generator UI", () => {
     expect(box?.width).toBeGreaterThanOrEqual((viewport?.width ?? 0) - 2);
     await expect(page.locator(".brand")).toContainText("Normalizer");
     await expect(page.locator("#exportButton")).toBeVisible();
+    await expect(page.locator("#exportPackButton")).toBeVisible();
     await expect(page.locator("#sampleButton")).toBeVisible();
   });
 
   test("preview tab bar switches modes", async ({ page }) => {
     const tabs = page.locator(".preview-tab");
-    await expect(tabs).toHaveCount(5);
+    await expect(tabs).toHaveCount(7);
 
-    for (const mode of ["split", "lit", "normal", "base", "specular"]) {
+    for (const mode of ["split", "lit", "normal", "base", "specular", "parallax", "occlusion"]) {
       await page.locator(`.preview-tab[data-mode="${mode}"]`).click();
       await expect(page.locator(`.preview-tab[data-mode="${mode}"]`)).toHaveClass(/active/);
     }
@@ -129,5 +130,22 @@ test.describe("Normal Map Generator UI", () => {
     await page.locator("#exportButton").click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.png$/i);
+  });
+
+  test("export pack downloads zip with normalizer.json", async ({ page }) => {
+    // Wait until generated maps exist (debounced recompute after sample load).
+    await page.waitForFunction(
+      () => {
+        const status = document.querySelector("#status")?.textContent || "";
+        return /ms|sample ready|AI map ready/i.test(status);
+      },
+      { timeout: 20000 },
+    );
+    const downloadPromise = page.waitForEvent("download", { timeout: 15000 });
+    await page.locator("#exportPackButton").click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.zip$/i);
+    const path = await download.path();
+    expect(path).toBeTruthy();
   });
 });

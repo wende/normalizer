@@ -9,7 +9,7 @@ const FOLDER_ICON = (
   </svg>
 );
 
-export function Toolbar({ onOpenFile, onLoadSample, onExport }) {
+export function Toolbar({ onOpenFile, onLoadSample, onExport, onExportPack, exportPackBusy }) {
   const fileRef = useRef(null);
   return (
     <header class="toolbar">
@@ -36,6 +36,15 @@ export function Toolbar({ onOpenFile, onLoadSample, onExport }) {
       </div>
       <div class="actions">
         <button id="exportButton" type="button" onClick={onExport}>Export PNG</button>
+        <button
+          id="exportPackButton"
+          type="button"
+          onClick={onExportPack}
+          disabled={exportPackBusy}
+          title="Download all maps as a ZIP with normalizer.json"
+        >
+          {exportPackBusy ? "Exporting…" : "Export Pack"}
+        </button>
       </div>
     </header>
   );

@@ -28,11 +28,18 @@ import {
 } from "./previewRender.js";
 import { adjustNormalMap } from "./normalAdjust.js";
 import { useNormalWorker } from "./useNormalWorker.js";
+import {
+  buildExportArchive,
+  downloadZip,
+  imageDataToPngBytes,
+  singleMapFilename,
+} from "./exportPack.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
 const LIGHT_SPRITE_SRC = "./normalizer_texture.png";
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
+const SAMPLE_BASE_NAME = "demo";
 
 async function decodeImage(src) {
   const image = new Image();
@@ -64,6 +71,8 @@ export function App() {
   const [occlusionControls, setOcclusionControls] = useState(DEFAULT_OCCLUSION);
   const [lightControls, setLightControls] = useState(DEFAULT_LIGHT_CONTROLS);
   const [aiControls, setAiControls] = useState(DEFAULT_AI_CONTROLS);
+  const [sourceName, setSourceName] = useState(SAMPLE_BASE_NAME);
+  const [exportPackBusy, setExportPackBusy] = useState(false);
   const lastRect = useRef(null);
   const draggingLight = useRef(false);
   const lightSprite = useRef(null);
@@ -286,9 +295,10 @@ export function App() {
     });
   }, []);
 
-  const loadFromImage = useCallback(async (image, { aiNormalImage = null } = {}) => {
+  const loadFromImage = useCallback(async (image, { aiNormalImage = null, baseName = SAMPLE_BASE_NAME } = {}) => {
     const data = readSourceFromImage(image);
     setSource(data);
+    setSourceName(baseName);
     // Sample ships a precomputed DeepBump map; uploads clear AI until regenerate.
     setAiOverlay(aiNormalImage ? readSourceFromImage(aiNormalImage) : null);
     if (aiNormalImage) setPipeline("ai");
@@ -303,7 +313,7 @@ export function App() {
         decodeImage(SAMPLE_SRC),
         decodeImage(SAMPLE_AI_NORMAL_SRC),
       ]);
-      await loadFromImage(image, { aiNormalImage });
+      await loadFromImage(image, { aiNormalImage, baseName: SAMPLE_BASE_NAME });
       setStatus(`${image.naturalWidth}x${image.naturalHeight} - sample ready`);
     } catch (error) {
       setStatus(error.message || SAMPLE_LOAD_ERROR);
@@ -318,11 +328,51 @@ export function App() {
       const image = new Image();
       image.src = url;
       await image.decode();
-      await loadFromImage(image);
+      await loadFromImage(image, { baseName: file.name || SAMPLE_BASE_NAME });
     } finally {
       URL.revokeObjectURL(url);
     }
   }, [loadFromImage]);
+
+  const onExportPng = useCallback(() => {
+    const base = sourceName || SAMPLE_BASE_NAME;
+    if (mode === "specular") return exportPng(specularMap, singleMapFilename(base, "specular"));
+    if (mode === "parallax") return exportPng(parallaxMap, singleMapFilename(base, "height"));
+    if (mode === "occlusion") return exportPng(occlusionMap, singleMapFilename(base, "occlusion"));
+    if (mode === "base") return exportPng(source, singleMapFilename(base, "albedo"));
+    return exportPng(activeNormal, singleMapFilename(base, "normal"));
+  }, [mode, sourceName, source, specularMap, parallaxMap, occlusionMap, activeNormal]);
+
+  const onExportPack = useCallback(async () => {
+    if (!source) {
+      setStatus("Load an image first.");
+      return;
+    }
+    if (exportPackBusy) return;
+    setExportPackBusy(true);
+    setStatus("Building export pack…");
+    try {
+      const { bytes, filename } = await buildExportArchive({
+        baseName: sourceName || SAMPLE_BASE_NAME,
+        images: {
+          albedo: source,
+          normal: activeNormal || null,
+          height: parallaxMap || null,
+          occlusion: occlusionMap || null,
+          specular: specularMap || null,
+        },
+        encodePng: imageDataToPngBytes,
+      });
+      downloadZip(bytes, filename);
+      setStatus(`Exported ${filename}`);
+    } catch (error) {
+      setStatus(error.message || "Export pack failed");
+    } finally {
+      setExportPackBusy(false);
+    }
+  }, [
+    source, sourceName, activeNormal, parallaxMap, occlusionMap, specularMap, exportPackBusy,
+  ]);
 
   // Initial sample load.
   useEffect(() => {
@@ -334,12 +384,9 @@ export function App() {
       <Toolbar
         onOpenFile={onOpenFile}
         onLoadSample={loadSample}
-        onExport={() => {
-          if (mode === "specular") return exportPng(specularMap, "normalizer-specular.png");
-          if (mode === "parallax") return exportPng(parallaxMap, "normalizer-parallax.png");
-          if (mode === "occlusion") return exportPng(occlusionMap, "normalizer-occlusion.png");
-          return exportPng(activeNormal, "normalizer-normal.png");
-        }}
+        onExport={onExportPng}
+        onExportPack={onExportPack}
+        exportPackBusy={exportPackBusy}
       />
       <PreviewTabBar
         mode={mode}
