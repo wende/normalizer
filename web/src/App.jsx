@@ -57,6 +57,7 @@ export function App() {
   const [tab, setTab] = useState("light"); // controls tab
   const [status, setStatus] = useState("Ready");
   const [light, setLight] = useState({ x: 0, y: 0 });
+  const [shadowContact, setShadowContact] = useState({ x: 0.5, y: 1 });
   const [normalControls, setNormalControls] = useState(DEFAULT_NORMAL);
   const [specularControls, setSpecularControls] = useState(DEFAULT_SPECULAR);
   const [parallaxControls, setParallaxControls] = useState(DEFAULT_PARALLAX);
@@ -253,13 +254,20 @@ export function App() {
     lightSettings: buildLightSettings(light, lightControls),
     toon: lightControls.toon,
     pixelated: lightControls.pixelated,
+    shadow: {
+      enabled: lightControls.shadowEnabled,
+      casterHeight: lightControls.shadowCasterHeight,
+      opacity: lightControls.shadowOpacity,
+      softness: lightControls.shadowSoftness,
+      contact: shadowContact,
+    },
     draggingLight: draggingLight.current,
     draggingSplit,
     lightSprite: lightSprite.current,
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
     onSplitDragChange: setDraggingSplit,
-  }), [source, activeNormal, specularMap, parallaxMap, occlusionMap, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
+  }), [source, activeNormal, specularMap, parallaxMap, occlusionMap, mode, pipeline, light, shadowContact, splitRatio, draggingSplit, lightControls]);
 
   const onSplitRatioChange = useCallback((next) => {
     setSplitRatio((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
@@ -271,6 +279,10 @@ export function App() {
     setLight((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
   }, [source]);
 
+  const onShadowContactMove = useCallback((next) => {
+    setShadowContact(next);
+  }, []);
+
   const loadFromImage = useCallback(async (image, { aiNormalImage = null } = {}) => {
     const data = readSourceFromImage(image);
     setSource(data);
@@ -278,6 +290,7 @@ export function App() {
     setAiOverlay(aiNormalImage ? readSourceFromImage(aiNormalImage) : null);
     if (aiNormalImage) setPipeline("ai");
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
+    setShadowContact({ x: 0.5, y: 1 });
   }, []);
 
   const loadSample = useCallback(async () => {
@@ -337,6 +350,7 @@ export function App() {
           <PreviewArea
             drawArgs={drawArgs}
             onLightMove={onLightMove}
+            onShadowContactMove={onShadowContactMove}
             onSplitRatioChange={onSplitRatioChange}
             splitRatio={splitRatio}
             lightSprite={lightSprite.current}

@@ -8,7 +8,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite --port 8765 --strictPort",
-    "test": "node tests/specular.test.js && node tests/parallax.test.js && node tests/occlusion.test.js",
+    "test": "node tests/specular.test.js && node tests/parallax.test.js && node tests/occlusion.test.js && node tests/shadow.test.js",
     "test:e2e": "playwright test --config web/playwright.config.js"
   },
   "dependencies": {

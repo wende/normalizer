@@ -14,6 +14,7 @@
 
 import { buildLitPreview } from "shared/preview.js";
 import { fitRect } from "./previewRender.js";
+import { computeShadowProjection, SHADOW_BAND_COUNT, shadowBand, shadowSoftnessTaps } from "./shadow.js";
 
 const VERT = `#version 300 es
 in vec2 aPos;   // destination pixel coords, y-down (canvas space)
@@ -31,7 +32,7 @@ const FRAG = `#version 300 es
 precision highp float;
 in vec2 vUV;
 out vec4 frag;
-uniform int uMode;          // 0 = passthrough, 1 = lit
+uniform int uMode;          // 0 = passthrough, 1 = lit, 2 = alpha shadow
 uniform sampler2D uTex;     // diffuse/albedo (always the source image)
 uniform sampler2D uNormal;  // tangent-space normal map
 uniform vec2 uResolution;   // source pixel dims
@@ -42,9 +43,15 @@ uniform sampler2D uSpecularMap;  // specular reflectivity map (grayscale)
 uniform int uHasSpecularMap;     // 0 = full reflectivity, 1 = sample uSpecularMap
 uniform vec3 uAmbientColor;  uniform float uAmbientIntensity;
 uniform int uToon;
+uniform float uShadowOpacity;
 void main() {
   vec4 tex = texture(uTex, vUV);
   if (uMode == 0) { frag = tex; return; }
+  if (uMode == 2) {
+    if (tex.a <= 0.0) discard;
+    frag = vec4(0.0, 0.0, 0.0, tex.a * uShadowOpacity);
+    return;
+  }
   vec3 n01 = texture(uNormal, vUV).rgb;
   vec3 N = vec3(n01.r * 2.0 - 1.0, n01.g * 2.0 - 1.0, n01.b * 2.0 - 1.0);
   // Match buildLitPreview's pixel grid: vUV lands on pixel centers, so
@@ -100,7 +107,7 @@ export function createLitGL(canvas) {
     "uCanvasSize", "uMode", "uTex", "uNormal", "uResolution", "uLightPos",
     "uDiffuseColor", "uDiffuseIntensity", "uSpecularColor", "uSpecularIntensity",
     "uSpecularScatter", "uSpecularMap", "uHasSpecularMap",
-    "uAmbientColor", "uAmbientIntensity", "uToon",
+    "uAmbientColor", "uAmbientIntensity", "uToon", "uShadowOpacity",
   ]) {
     loc[name] = gl.getUniformLocation(prog, name);
   }
@@ -117,8 +124,8 @@ export function createLitGL(canvas) {
   gl.bindVertexArray(null);
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture(), parallax: gl.createTexture() };
-  const ref = { source: null, normal: null, specular: null, parallax: null };
+  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture(), parallax: gl.createTexture(), occlusion: gl.createTexture() };
+  const ref = { source: null, normal: null, specular: null, parallax: null, occlusion: null };
 
   // Upload (or re-upload) an ImageData into its slot only when the reference
   // changes; always (re)apply the min/mag filter — cheap, and `pixelated` can
@@ -149,6 +156,24 @@ export function createLitGL(canvas) {
       r.x + r.width, r.y, 1, 0,
       r.x, r.y + r.height, 0, 1,
       r.x + r.width, r.y + r.height, 1, 1,
+    ]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.DYNAMIC_DRAW);
+  }
+
+  // A strip maps one source-row range into a sheared destination quad. Its
+  // top and bottom displacement are shared with neighbouring strips, giving a
+  // continuous projected silhouette rather than disconnected stamped slices.
+  function setShadowBandQuad(rect, band, tap) {
+    const topY = rect.y + band.start * rect.height + band.yStart + tap.y;
+    const bottomY = rect.y + band.end * rect.height + band.yEnd + tap.y;
+    const leftTop = rect.x + band.xStart + tap.x;
+    const leftBottom = rect.x + band.xEnd + tap.x;
+    const verts = new Float32Array([
+      leftTop, topY, 0, band.start,
+      leftTop + rect.width, topY, 1, band.start,
+      leftBottom, bottomY, 0, band.end,
+      leftBottom + rect.width, bottomY, 1, band.end,
     ]);
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
     gl.bufferData(gl.ARRAY_BUFFER, verts, gl.DYNAMIC_DRAW);
@@ -191,13 +216,32 @@ export function createLitGL(canvas) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
+  function drawShadow(source, settings, shadow, rect, pixelated) {
+    if (!shadow?.enabled || shadow.opacity <= 0) return;
+    upload("source", source, pixelated);
+    bindUnit(0, tex.source);
+    gl.uniform1i(loc.uTex, 0);
+    gl.uniform1i(loc.uMode, 2);
+    const projection = computeShadowProjection(source, rect, settings, shadow);
+    const ratio = window.devicePixelRatio || 1;
+    const taps = shadowSoftnessTaps(projection, shadow.softness * ratio);
+    for (let i = 0; i < SHADOW_BAND_COUNT; i += 1) {
+      const band = shadowBand(projection, i);
+      for (const tap of taps) {
+        setShadowBandQuad(rect, band, tap);
+        gl.uniform1f(loc.uShadowOpacity, shadow.opacity / 100 * tap.weight);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+    }
+  }
+
   /**
    * Render the current mode into the canvas. Returns the fitted rect (for
    * overlay hit-testing) or null when there is nothing to draw.
    * `normal` is the active normal for the current pipeline (procedural or AI).
    */
   function draw(state) {
-    const { source, normal, specular, parallax, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
+    const { source, normal, specular, parallax, occlusion, shadow, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
     const ratio = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
     const cw = Math.max(320, Math.round(bounds.width * ratio));
@@ -215,10 +259,11 @@ export function createLitGL(canvas) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     if (!source) return null;
-    const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax";
+    const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax" && mode !== "occlusion";
     if (needsNormal && !normal) return null; // overlay draws the AI placeholder
     if (mode === "specular" && !specular) return null;
     if (mode === "parallax" && !parallax) return null;
+    if (mode === "occlusion" && !occlusion) return null;
 
     const rect = fitRect(source.width, source.height, cw - 48, ch - 48);
     gl.useProgram(prog);
@@ -226,12 +271,19 @@ export function createLitGL(canvas) {
     gl.bindVertexArray(vao);
     setQuad(rect);
 
+    if (mode === "lit") {
+      drawShadow(source, lightSettings, shadow, rect, pixelated);
+      setQuad(rect);
+    }
+
     if (mode === "base") {
       drawPassthrough("source", source, pixelated);
     } else if (mode === "specular") {
       drawPassthrough("specular", specular, pixelated);
     } else if (mode === "parallax") {
       drawPassthrough("parallax", parallax, pixelated);
+    } else if (mode === "occlusion") {
+      drawPassthrough("occlusion", occlusion, pixelated);
     } else if (mode === "normal") {
       drawPassthrough("normal", normal, pixelated);
     } else if (mode === "lit") {
@@ -320,6 +372,7 @@ export function createLitGL(canvas) {
       ref.normal = null;
       ref.specular = null;
       ref.parallax = null;
+      ref.occlusion = null;
       if (max > 3) {
         console.warn(`[litGL] shader/CPU parity delta = ${max} (expected ≤3 LSB)`);
       } else {
