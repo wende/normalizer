@@ -174,45 +174,6 @@ export function ControlsPanel({
             onChange={(v) => onLightControlsChange({ lightHeight: v })}
           />
         </ControlCard>
-
-        <ControlCard title="Shadow">
-          <div class="toggles">
-            <ToggleRow
-              id="shadowEnabled"
-              checked={lightControls.shadowEnabled}
-              onChange={(v) => onLightControlsChange({ shadowEnabled: v })}
-            >
-              Enabled
-            </ToggleRow>
-          </div>
-          <RangeRow
-            label="Caster height"
-            id="shadowCasterHeight"
-            min={0}
-            max={100}
-            value={lightControls.shadowCasterHeight}
-            onChange={(v) => onLightControlsChange({ shadowCasterHeight: v })}
-            format={(v) => `${v}%`}
-          />
-          <RangeRow
-            label="Opacity"
-            id="shadowOpacity"
-            min={0}
-            max={100}
-            value={lightControls.shadowOpacity}
-            onChange={(v) => onLightControlsChange({ shadowOpacity: v })}
-            format={(v) => `${v}%`}
-          />
-          <RangeRow
-            label="Softness"
-            id="shadowSoftness"
-            min={0}
-            max={20}
-            value={lightControls.shadowSoftness}
-            onChange={(v) => onLightControlsChange({ shadowSoftness: v })}
-            format={(v) => `${v}px`}
-          />
-        </ControlCard>
       </div>
       )}
 

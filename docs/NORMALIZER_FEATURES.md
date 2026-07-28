@@ -2,8 +2,8 @@
 
 Prioritized implement/defer/drop split of the remaining work from
 [REWRITE_PLAN.md](REWRITE_PLAN.md), decided 2026-07-06.
-Status re-verified 2026-07-29 after merging the occlusion, web-worker, and
-alpha-shadow branches.
+Status re-verified 2026-07-29 after merging the occlusion and web-worker
+branches; lit-preview alpha shadow was later dropped (see §4).
 
 ## Decisions this plan is based on
 
@@ -88,8 +88,8 @@ inventory in REWRITE_PLAN.md §2.
   full conversion (drop upstream comparison, keep only self-regression) is
   not done. See `PREVIEW_GOLDEN_STRATEGY.md`.
 - ✅ ~~**Unit tests wired into npm**~~ — DONE. `npm test` runs
-  `tests/specular.test.js`, `tests/parallax.test.js`,
-  `tests/occlusion.test.js`, and `tests/shadow.test.js` (118 checks).
+  `tests/specular.test.js`, `tests/parallax.test.js`, and
+  `tests/occlusion.test.js`.
 
 ## 3. Defer (real value, wrong time — with re-entry triggers)
 
@@ -115,6 +115,13 @@ inventory in REWRITE_PLAN.md §2.
   — DROPPED. No Emscripten/WASM/`.ts` anywhere in the tree; decision held.
 - ✅ ~~**Legacy preset import** and **`.laigter` project import**~~ — DROPPED.
   Neither present. (Revisit only if this becomes a public successor.)
+- ✅ ~~**Lit-preview alpha / drop shadow**~~ — DROPPED for now. Shipped via
+  `codex/park-alpha-shadow` (`762bc15`, merged `400cf3a`) as a preview-only
+  contact shadow (band-projected silhouette + softness taps in
+  `web/src/shadow.js`, Shadow card in the Light tab, draggable contact
+  handle, `litGL` mode-2 pass). It did not behave as intended in practice,
+  so the UI, math module, shader pass, unit tests, and e2e coverage were
+  removed. Revisit only with a clearer silhouette / ground-plane model.
 
 ## Known loss / escape hatch
 
@@ -138,11 +145,6 @@ present. Consistent with the escape hatch: still reclaimable.
   Smooth / Steps (live) and Denoise / Overlap (regenerate). The model can be
   self-hosted by dropping `deepbump256.onnx` next to the worker and editing
   `DEFAULT_MODEL_URL`. Scope is normal maps only — no specular/roughness/AO.
-- **Lit-preview alpha shadow** (merged `codex/park-alpha-shadow`) —
-  `web/src/shadow.js` computes a contact-shadow projection with softness
-  taps; a Shadow card in the Light tab (enabled / caster height / opacity /
-  softness) and a draggable shadow-contact handle drive a shadow pass in the
-  `litGL` shader.
 - **Invert X/Y/Z is CLI-only by design** — the shared normal generator and
   the CLI support channel inversion, but the web UI deliberately does not
   expose it. These are pipeline-correction flags for CLI/batch use; in the

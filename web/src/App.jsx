@@ -58,7 +58,6 @@ export function App() {
   const [status, setStatus] = useState("Ready");
   const [light, setLight] = useState({ x: 0, y: 0 });
   const [viewTilt, setViewTilt] = useState({ x: 0, y: 0 });
-  const [shadowContact, setShadowContact] = useState({ x: 0.5, y: 1 });
   const [normalControls, setNormalControls] = useState(DEFAULT_NORMAL);
   const [specularControls, setSpecularControls] = useState(DEFAULT_SPECULAR);
   const [parallaxControls, setParallaxControls] = useState(DEFAULT_PARALLAX);
@@ -257,13 +256,6 @@ export function App() {
     lightSettings: buildLightSettings(light, lightControls),
     toon: lightControls.toon,
     pixelated: lightControls.pixelated,
-    shadow: {
-      enabled: lightControls.shadowEnabled,
-      casterHeight: lightControls.shadowCasterHeight,
-      opacity: lightControls.shadowOpacity,
-      softness: lightControls.shadowSoftness,
-      contact: shadowContact,
-    },
     draggingLight: draggingLight.current,
     draggingSplit,
     lightSprite: lightSprite.current,
@@ -272,7 +264,7 @@ export function App() {
     onSplitDragChange: setDraggingSplit,
   }), [
     source, activeNormal, specularMap, parallaxMap, occlusionMap,
-    mode, pipeline, light, viewTilt, shadowContact, parallaxControls.previewParallaxDepth,
+    mode, pipeline, light, viewTilt, parallaxControls.previewParallaxDepth,
     splitRatio, draggingSplit, lightControls,
   ]);
 
@@ -294,10 +286,6 @@ export function App() {
     });
   }, []);
 
-  const onShadowContactMove = useCallback((next) => {
-    setShadowContact(next);
-  }, []);
-
   const loadFromImage = useCallback(async (image, { aiNormalImage = null } = {}) => {
     const data = readSourceFromImage(image);
     setSource(data);
@@ -306,7 +294,6 @@ export function App() {
     if (aiNormalImage) setPipeline("ai");
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
     setViewTilt({ x: 0, y: 0 });
-    setShadowContact({ x: 0.5, y: 1 });
   }, []);
 
   const loadSample = useCallback(async () => {
@@ -364,7 +351,6 @@ export function App() {
             drawArgs={drawArgs}
             onLightMove={onLightMove}
             onViewTilt={onViewTilt}
-            onShadowContactMove={onShadowContactMove}
             onSplitRatioChange={onSplitRatioChange}
             splitRatio={splitRatio}
             lightSprite={lightSprite.current}
