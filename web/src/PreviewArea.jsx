@@ -12,6 +12,18 @@ import {
 } from "./previewRender.js";
 import { createLitGL } from "./litGL.js";
 
+// Pointer delta (canvas px) → tilt. A drag of ~half the fitted image width
+// reaches |tilt| ≈ 1.
+const VIEW_TILT_CLAMP = 1;
+
+function clampTilt(v) {
+  return Math.max(-VIEW_TILT_CLAMP, Math.min(VIEW_TILT_CLAMP, v));
+}
+
+function canTiltView(mode) {
+  return mode === "lit" || mode === "split";
+}
+
 function drawSplitDivider(octx, rect, splitRatio, dragging) {
   const ratio = window.devicePixelRatio || 1;
   const x = splitDividerX(rect, splitRatio);
@@ -46,6 +58,7 @@ function cpuFallback(overlay, octx, drawArgs) {
     source, normal, specular, parallax, mode, pipeline, light, pixelated, draggingLight, lightSprite,
     lightSettings, toon, splitRatio,
   } = drawArgs;
+  // Steep parallax is WebGL-only; CPU lit path ignores heightScale / viewTilt.
   const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular) : null;
   return drawPreview({
     canvas: overlay,
@@ -85,6 +98,8 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
       toon: drawArgs.toon,
       pixelated: drawArgs.pixelated,
       splitRatio: drawArgs.splitRatio ?? 0.5,
+      heightScale: drawArgs.heightScale ?? 0,
+      viewTilt: drawArgs.viewTilt ?? { x: 0, y: 0 },
     });
     if (overlay.width !== glCanvas.width || overlay.height !== glCanvas.height) {
       overlay.width = glCanvas.width;
@@ -106,6 +121,7 @@ function paintAll(glRef, glInitRef, glCanvas, overlay, drawArgs, stageEl) {
 export function PreviewArea({
   drawArgs,
   onLightMove,
+  onViewTilt,
   onSplitRatioChange,
   splitRatio,
   lightSprite,
@@ -116,7 +132,7 @@ export function PreviewArea({
   const stageRef = useRef(null);
   const glRef = useRef(null);
   const glInitRef = useRef(false);
-  const dragState = useRef({ kind: null, pointerId: null });
+  const dragState = useRef({ kind: null, pointerId: null, startPoint: null, startTilt: null });
 
   useEffect(() => {
     paintAll(glRef, glInitRef, glCanvasRef.current, canvasRef.current, drawArgs, stageRef.current);
@@ -135,14 +151,18 @@ export function PreviewArea({
     const rect = lastRectRef.current;
     const source = drawArgs.source;
     if (!canvas || !source || !rect) {
-      canvas.style.cursor = "";
+      if (canvas) canvas.style.cursor = "";
       return;
     }
     if (drawArgs.mode === "split" && pointHitsSplitDivider(point, rect, splitRatio)) {
       canvas.style.cursor = "col-resize";
       return;
     }
-    canvas.style.cursor = pointHitsLight(point, drawArgs.light, source, rect) ? "grab" : "";
+    if (pointHitsLight(point, drawArgs.light, source, rect)) {
+      canvas.style.cursor = "grab";
+      return;
+    }
+    canvas.style.cursor = canTiltView(drawArgs.mode) ? "grab" : "";
   };
 
   const handlePointerDown = (e) => {
@@ -153,7 +173,7 @@ export function PreviewArea({
 
     if (drawArgs.mode === "split" && pointHitsSplitDivider(point, rect, splitRatio)) {
       e.preventDefault();
-      dragState.current = { kind: "split", pointerId: e.pointerId };
+      dragState.current = { kind: "split", pointerId: e.pointerId, startPoint: null, startTilt: null };
       canvasRef.current.setPointerCapture(e.pointerId);
       canvasRef.current.style.cursor = "col-resize";
       drawArgs.onSplitDragChange(true);
@@ -161,12 +181,27 @@ export function PreviewArea({
       return;
     }
 
-    if (!pointHitsLight(point, drawArgs.light, source, rect)) return;
-    e.preventDefault();
-    dragState.current = { kind: "light", pointerId: e.pointerId };
-    canvasRef.current.setPointerCapture(e.pointerId);
-    canvasRef.current.style.cursor = "grabbing";
-    drawArgs.onDragChange(true);
+    if (pointHitsLight(point, drawArgs.light, source, rect)) {
+      e.preventDefault();
+      dragState.current = { kind: "light", pointerId: e.pointerId, startPoint: null, startTilt: null };
+      canvasRef.current.setPointerCapture(e.pointerId);
+      canvasRef.current.style.cursor = "grabbing";
+      drawArgs.onDragChange(true);
+      return;
+    }
+
+    if (canTiltView(drawArgs.mode) && onViewTilt) {
+      e.preventDefault();
+      const tilt = drawArgs.viewTilt ?? { x: 0, y: 0 };
+      dragState.current = {
+        kind: "view",
+        pointerId: e.pointerId,
+        startPoint: point,
+        startTilt: { x: tilt.x, y: tilt.y },
+      };
+      canvasRef.current.setPointerCapture(e.pointerId);
+      canvasRef.current.style.cursor = "grabbing";
+    }
   };
 
   const handlePointerMove = (e) => {
@@ -180,6 +215,19 @@ export function PreviewArea({
     if (dragState.current.kind === "light") {
       e.preventDefault();
       onLightMove(point);
+      return;
+    }
+    if (dragState.current.kind === "view") {
+      e.preventDefault();
+      const rect = lastRectRef.current;
+      const { startPoint, startTilt } = dragState.current;
+      if (!rect || !startPoint || !startTilt || !onViewTilt) return;
+      const scale = 2 / Math.max(1, rect.width);
+      // Screen y grows downward; shader viewDir.y is up — flip dy.
+      onViewTilt({
+        x: clampTilt(startTilt.x + (point.x - startPoint.x) * scale),
+        y: clampTilt(startTilt.y - (point.y - startPoint.y) * scale),
+      });
       return;
     }
     updateCursor(point);
@@ -196,7 +244,7 @@ export function PreviewArea({
     } else if (dragState.current.kind === "split") {
       drawArgs.onSplitDragChange(false);
     }
-    dragState.current = { kind: null, pointerId: null };
+    dragState.current = { kind: null, pointerId: null, startPoint: null, startTilt: null };
     updateCursor(eventPoint(e));
   };
 

@@ -9,28 +9,18 @@ import {
   DEFAULT_LIGHT_CONTROLS,
   DEFAULT_NORMAL,
   DEFAULT_SPECULAR,
-<<<<<<< HEAD
   DEFAULT_PARALLAX,
+  DEFAULT_PREVIEW,
   buildNormalParams,
   buildSpecularParams,
   buildParallaxParams,
-=======
-  DEFAULT_OCCLUSION,
-  buildNormalParams,
-  buildSpecularParams,
-  buildOcclusionParams,
->>>>>>> add-occlusion-map
 } from "./controls.js";
 import {
   buildLightSettings,
   drawPreview,
   exportPng,
   generateSpecular,
-<<<<<<< HEAD
   generateParallax,
-=======
-  generateOcclusion,
->>>>>>> add-occlusion-map
   readSourceFromImage,
   canvasToLight,
 } from "./previewRender.js";
@@ -54,11 +44,7 @@ export function App() {
   const [source, setSource] = useState(null);
   const [proceduralNormal, setProceduralNormal] = useState(null);
   const [specularMap, setSpecularMap] = useState(null);
-<<<<<<< HEAD
   const [parallaxMap, setParallaxMap] = useState(null);
-=======
-  const [occlusionMap, setOcclusionMap] = useState(null);
->>>>>>> add-occlusion-map
   const [aiOverlay, setAiOverlay] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [pipeline, setPipeline] = useState("ai"); // "procedural" | "ai"
@@ -68,25 +54,19 @@ export function App() {
   const [tab, setTab] = useState("light"); // controls tab
   const [status, setStatus] = useState("Ready");
   const [light, setLight] = useState({ x: 0, y: 0 });
+  const [viewTilt, setViewTilt] = useState({ x: 0, y: 0 });
   const [normalControls, setNormalControls] = useState(DEFAULT_NORMAL);
   const [specularControls, setSpecularControls] = useState(DEFAULT_SPECULAR);
-<<<<<<< HEAD
   const [parallaxControls, setParallaxControls] = useState(DEFAULT_PARALLAX);
-=======
-  const [occlusionControls, setOcclusionControls] = useState(DEFAULT_OCCLUSION);
->>>>>>> add-occlusion-map
   const [lightControls, setLightControls] = useState(DEFAULT_LIGHT_CONTROLS);
+  const [previewControls, setPreviewControls] = useState(DEFAULT_PREVIEW);
   const [aiControls, setAiControls] = useState(DEFAULT_AI_CONTROLS);
   const lastRect = useRef(null);
   const draggingLight = useRef(false);
   const lightSprite = useRef(null);
   const generateTimer = useRef(0);
   const specularTimer = useRef(0);
-<<<<<<< HEAD
   const parallaxTimer = useRef(0);
-=======
-  const occlusionTimer = useRef(0);
->>>>>>> add-occlusion-map
   const aiWorker = useRef(null);
 
   // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
@@ -120,16 +100,14 @@ export function App() {
   const onSpecularControlsChange = useCallback((patch) => {
     setSpecularControls((prev) => ({ ...prev, ...patch }));
   }, []);
-<<<<<<< HEAD
   const onParallaxControlsChange = useCallback((patch) => {
     setParallaxControls((prev) => ({ ...prev, ...patch }));
-=======
-  const onOcclusionControlsChange = useCallback((patch) => {
-    setOcclusionControls((prev) => ({ ...prev, ...patch }));
->>>>>>> add-occlusion-map
   }, []);
   const onLightControlsChange = useCallback((patch) => {
     setLightControls((prev) => ({ ...prev, ...patch }));
+  }, []);
+  const onPreviewControlsChange = useCallback((patch) => {
+    setPreviewControls((prev) => ({ ...prev, ...patch }));
   }, []);
   const onAiControlsChange = useCallback((patch) => {
     setAiControls((prev) => ({ ...prev, ...patch }));
@@ -236,7 +214,6 @@ export function App() {
     return () => clearTimeout(specularTimer.current);
   }, [source, specularControls]);
 
-<<<<<<< HEAD
   // Parallax map — recomputed (debounced) from the source + parallax sliders.
   useEffect(() => {
     if (!source) return;
@@ -247,35 +224,21 @@ export function App() {
     }, 40);
     return () => clearTimeout(parallaxTimer.current);
   }, [source, parallaxControls]);
-=======
-  // Occlusion map — recomputed (debounced) from the source + occlusion sliders.
-  useEffect(() => {
-    if (!source) return;
-    clearTimeout(occlusionTimer.current);
-    occlusionTimer.current = setTimeout(() => {
-      const params = buildOcclusionParams(occlusionControls);
-      setOcclusionMap(generateOcclusion(source, params));
-    }, 40);
-    return () => clearTimeout(occlusionTimer.current);
-  }, [source, occlusionControls]);
->>>>>>> add-occlusion-map
 
-  // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
-  // only update a shader uniform, so no ImageData is rebuilt per drag here.
+  // Lit preview is rendered on the GPU by litGL (PreviewArea) — light / view
+  // tilt only update shader uniforms, so no ImageData is rebuilt per drag.
   const drawArgs = useMemo(() => ({
     source,
     normal: activeNormal,
     specular: specularMap,
-<<<<<<< HEAD
     parallax: parallaxMap,
-=======
-    occlusion: occlusionMap,
->>>>>>> add-occlusion-map
     mode,
     pipeline,
     light,
+    viewTilt,
     splitRatio,
     lightSettings: buildLightSettings(light, lightControls),
+    heightScale: previewControls.previewParallaxDepth / 1000,
     toon: lightControls.toon,
     pixelated: lightControls.pixelated,
     draggingLight: draggingLight.current,
@@ -284,11 +247,7 @@ export function App() {
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
     onSplitDragChange: setDraggingSplit,
-<<<<<<< HEAD
-  }), [source, activeNormal, specularMap, parallaxMap, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
-=======
-  }), [source, activeNormal, specularMap, occlusionMap, mode, pipeline, light, splitRatio, draggingSplit, lightControls]);
->>>>>>> add-occlusion-map
+  }), [source, activeNormal, specularMap, parallaxMap, mode, pipeline, light, viewTilt, splitRatio, draggingSplit, lightControls, previewControls]);
 
   const onSplitRatioChange = useCallback((next) => {
     setSplitRatio((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
@@ -300,6 +259,14 @@ export function App() {
     setLight((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
   }, [source]);
 
+  const onViewTilt = useCallback((next) => {
+    setViewTilt((prev) => (
+      Math.abs(prev.x - next.x) < 0.001 && Math.abs(prev.y - next.y) < 0.001
+        ? prev
+        : next
+    ));
+  }, []);
+
   const loadFromImage = useCallback(async (image, { aiNormalImage = null } = {}) => {
     const data = readSourceFromImage(image);
     setSource(data);
@@ -307,6 +274,7 @@ export function App() {
     setAiOverlay(aiNormalImage ? readSourceFromImage(aiNormalImage) : null);
     if (aiNormalImage) setPipeline("ai");
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
+    setViewTilt({ x: 0, y: 0 });
   }, []);
 
   const loadSample = useCallback(async () => {
@@ -347,7 +315,6 @@ export function App() {
       <Toolbar
         onOpenFile={onOpenFile}
         onLoadSample={loadSample}
-<<<<<<< HEAD
         onExport={() => (
           mode === "specular"
             ? exportPng(specularMap, "laigter-specular.png")
@@ -355,13 +322,6 @@ export function App() {
               ? exportPng(parallaxMap, "laigter-parallax.png")
               : exportPng(activeNormal, "laigter-normal.png")
         )}
-=======
-        onExport={() => {
-          if (mode === "specular") return exportPng(specularMap, "laigter-specular.png");
-          if (mode === "occlusion") return exportPng(occlusionMap, "laigter-occlusion.png");
-          return exportPng(activeNormal, "laigter-normal.png");
-        }}
->>>>>>> add-occlusion-map
       />
       <PreviewTabBar
         mode={mode}
@@ -372,6 +332,7 @@ export function App() {
           <PreviewArea
             drawArgs={drawArgs}
             onLightMove={onLightMove}
+            onViewTilt={onViewTilt}
             onSplitRatioChange={onSplitRatioChange}
             splitRatio={splitRatio}
             lightSprite={lightSprite.current}
@@ -386,15 +347,12 @@ export function App() {
           onNormalControlsChange={onNormalControlsChange}
           specularControls={specularControls}
           onSpecularControlsChange={onSpecularControlsChange}
-<<<<<<< HEAD
           parallaxControls={parallaxControls}
           onParallaxControlsChange={onParallaxControlsChange}
-=======
-          occlusionControls={occlusionControls}
-          onOcclusionControlsChange={onOcclusionControlsChange}
->>>>>>> add-occlusion-map
           lightControls={lightControls}
           onLightControlsChange={onLightControlsChange}
+          previewControls={previewControls}
+          onPreviewControlsChange={onPreviewControlsChange}
           aiControls={aiControls}
           onAiControlsChange={onAiControlsChange}
           onGenerateAI={onGenerateAI}

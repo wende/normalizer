@@ -1,8 +1,8 @@
 /*
  * Lit-preview WebGL2 renderer — derived from laigter/shaders/fshader.glsl
- * (view_mode==5, single light, parallax off, occlusion=1). The fragment
- * shader mirrors the per-pixel math of buildLitPreview in shared/preview.js,
- * which stays the CPU parity reference and the no-WebGL fallback.
+ * (view_mode==5, single light, occlusion=1). Steep parallax mapping is
+ * enabled when a parallax map + height scale are supplied (WebGL-only;
+ * shared/preview.js CPU fallback stays without parallax).
  *
  * Why this exists: the JS loop in buildLitPreview is O(W·H) on every light
  * move. On the GPU the light is a uniform, so dragging is resolution-
@@ -40,15 +40,56 @@ uniform vec3 uDiffuseColor;  uniform float uDiffuseIntensity;
 uniform vec3 uSpecularColor; uniform float uSpecularIntensity; uniform float uSpecularScatter;
 uniform sampler2D uSpecularMap;  // specular reflectivity map (grayscale)
 uniform int uHasSpecularMap;     // 0 = full reflectivity, 1 = sample uSpecularMap
+uniform sampler2D uParallax;     // height / displacement (grayscale)
+uniform int uHasParallax;        // 0 = off, 1 = steep parallax mapping
+uniform float uHeightScale;      // Laigter height_scale (UI depth / 1000)
+uniform vec2 uViewTilt;          // camera tilt in ~[-1,1]; viewDir = normalize(tilt, 1)
 uniform vec3 uAmbientColor;  uniform float uAmbientIntensity;
 uniform int uToon;
+
+// Steep parallax + binary search refinement — ported from
+// laigter/shaders/fshader.glsl ParallaxMapping (Y-sign: +delta.y, -delta.x).
+vec2 parallaxMapping(vec2 texCoords, vec3 viewDir) {
+  const float minLayers = 10.0;
+  const float maxLayers = 100.0;
+  float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));
+  float layerDepth = 1.0 / numLayers;
+  float currentLayerDepth = 0.0;
+  vec2 P = viewDir.xy * uHeightScale;
+  vec2 deltaTexCoords = P / numLayers;
+
+  vec2 currentTexCoords = texCoords;
+  float currentDepthMapValue = texture(uParallax, currentTexCoords).r;
+  while (currentLayerDepth < currentDepthMapValue) {
+    currentTexCoords.y += deltaTexCoords.y;
+    currentTexCoords.x -= deltaTexCoords.x;
+    currentDepthMapValue = texture(uParallax, currentTexCoords).r;
+    currentLayerDepth += layerDepth;
+  }
+
+  vec2 prevTexCoords = vec2(currentTexCoords.x + deltaTexCoords.x,
+                            currentTexCoords.y - deltaTexCoords.y);
+  float afterDepth = currentDepthMapValue - currentLayerDepth;
+  float beforeDepth = texture(uParallax, prevTexCoords).r - currentLayerDepth + layerDepth;
+  float weight = afterDepth / (afterDepth - beforeDepth);
+  return prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+}
+
 void main() {
-  vec4 tex = texture(uTex, vUV);
+  vec2 uv = vUV;
+  if (uMode == 1 && uHasParallax == 1 && uHeightScale > 0.0) {
+    vec3 viewDir = normalize(vec3(uViewTilt.x, uViewTilt.y, 1.0));
+    uv = parallaxMapping(vUV, viewDir);
+    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) discard;
+  }
+
+  vec4 tex = texture(uTex, uv);
   if (uMode == 0) { frag = tex; return; }
-  vec3 n01 = texture(uNormal, vUV).rgb;
+  vec3 n01 = texture(uNormal, uv).rgb;
   vec3 N = vec3(n01.r * 2.0 - 1.0, n01.g * 2.0 - 1.0, n01.b * 2.0 - 1.0);
   // Match buildLitPreview's pixel grid: vUV lands on pixel centers, so
   // vUV*resolution == (px+0.5). fx = (px+0.5)-centerX, fy = centerY-(py+0.5).
+  // Lighting still uses the screen-space fragment position (vUV), not displaced UV.
   float fx = vUV.x * uResolution.x - uResolution.x * 0.5;
   float fy = uResolution.y * 0.5 - vUV.y * uResolution.y;
   vec3 L = normalize(vec3(uLightPos.x - fx, uLightPos.y - fy, uLightPos.z));
@@ -58,7 +99,7 @@ void main() {
   vec3 R = reflect(-L, N);
   float spec = pow(max(0.0, R.z), uSpecularScatter);
   if (uToon == 1) spec = smoothstep(0.005, 0.01, spec);
-  vec3 specMap = (uHasSpecularMap == 1) ? texture(uSpecularMap, vUV).rgb : vec3(1.0);
+  vec3 specMap = (uHasSpecularMap == 1) ? texture(uSpecularMap, uv).rgb : vec3(1.0);
   vec3 specular = uSpecularIntensity * spec * uSpecularColor * specMap;
   vec3 ambient = uAmbientColor * uAmbientIntensity;
   frag = vec4(tex.rgb * (diffuse + specular + ambient), tex.a);
@@ -100,6 +141,7 @@ export function createLitGL(canvas) {
     "uCanvasSize", "uMode", "uTex", "uNormal", "uResolution", "uLightPos",
     "uDiffuseColor", "uDiffuseIntensity", "uSpecularColor", "uSpecularIntensity",
     "uSpecularScatter", "uSpecularMap", "uHasSpecularMap",
+    "uParallax", "uHasParallax", "uHeightScale", "uViewTilt",
     "uAmbientColor", "uAmbientIntensity", "uToon",
   ]) {
     loc[name] = gl.getUniformLocation(prog, name);
@@ -159,13 +201,15 @@ export function createLitGL(canvas) {
     bindUnit(0, tex[key]);
     gl.uniform1i(loc.uTex, 0);
     gl.uniform1i(loc.uMode, 0);
+    gl.uniform1i(loc.uHasParallax, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  function drawLit(source, normal, settings, toon, pixelated, specular = null) {
+  function drawLit(source, normal, settings, toon, pixelated, specular = null, parallax = null, heightScale = 0, viewTilt = { x: 0, y: 0 }) {
     upload("source", source, pixelated);
     upload("normal", normal, pixelated);
     if (specular) upload("specular", specular, pixelated);
+    if (parallax) upload("parallax", parallax, pixelated);
     bindUnit(0, tex.source);
     gl.uniform1i(loc.uTex, 0);
     bindUnit(1, tex.normal);
@@ -176,6 +220,17 @@ export function createLitGL(canvas) {
       gl.uniform1i(loc.uHasSpecularMap, 1);
     } else {
       gl.uniform1i(loc.uHasSpecularMap, 0);
+    }
+    if (parallax && heightScale > 0) {
+      bindUnit(3, tex.parallax);
+      gl.uniform1i(loc.uParallax, 3);
+      gl.uniform1i(loc.uHasParallax, 1);
+      gl.uniform1f(loc.uHeightScale, heightScale);
+      gl.uniform2f(loc.uViewTilt, viewTilt.x, viewTilt.y);
+    } else {
+      gl.uniform1i(loc.uHasParallax, 0);
+      gl.uniform1f(loc.uHeightScale, 0);
+      gl.uniform2f(loc.uViewTilt, 0, 0);
     }
     gl.uniform1i(loc.uMode, 1);
     gl.uniform2f(loc.uResolution, source.width, source.height);
@@ -197,7 +252,10 @@ export function createLitGL(canvas) {
    * `normal` is the active normal for the current pipeline (procedural or AI).
    */
   function draw(state) {
-    const { source, normal, specular, parallax, mode, lightSettings, toon, pixelated, splitRatio = 0.5 } = state;
+    const {
+      source, normal, specular, parallax, mode, lightSettings, toon, pixelated,
+      splitRatio = 0.5, heightScale = 0, viewTilt = { x: 0, y: 0 },
+    } = state;
     const ratio = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
     const cw = Math.max(320, Math.round(bounds.width * ratio));
@@ -235,14 +293,14 @@ export function createLitGL(canvas) {
     } else if (mode === "normal") {
       drawPassthrough("normal", normal, pixelated);
     } else if (mode === "lit") {
-      drawLit(source, normal, lightSettings, toon, pixelated, specular);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, heightScale, viewTilt);
     } else {
       // split: diffuse underneath, lit over the right portion.
       drawPassthrough("source", source, pixelated);
       const splitPx = Math.round(rect.width * splitRatio);
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(rect.x + splitPx, ch - rect.y - rect.height, rect.width - splitPx, rect.height);
-      drawLit(source, normal, lightSettings, toon, pixelated, specular);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, heightScale, viewTilt);
       gl.disable(gl.SCISSOR_TEST);
     }
 
@@ -257,6 +315,7 @@ export function createLitGL(canvas) {
   // Dev-only parity check: render a small fixed fixture through both the CPU
   // reference (buildLitPreview) and this shader, warn if they diverge beyond a
   // few LSB. Catches uniform/math drift between the two implementations.
+  // Runs with parallax off so it stays comparable to the CPU path.
   function selfTest() {
     try {
       const W = 16;
@@ -295,7 +354,7 @@ export function createLitGL(canvas) {
       gl.uniform2f(loc.uCanvasSize, W, H);
       gl.bindVertexArray(vao);
       setQuad({ x: 0, y: 0, width: W, height: H });
-      drawLit(source, normal, settings, false, false, specular);
+      drawLit(source, normal, settings, false, false, specular, null, 0, { x: 0, y: 0 });
 
       const gpu = new Uint8Array(W * H * 4);
       gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, gpu);

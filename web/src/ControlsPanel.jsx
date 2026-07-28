@@ -2,11 +2,7 @@ import { RangeRow } from "./RangeRow.jsx";
 import { ToggleRow, ColorRow } from "./ToggleRow.jsx";
 import { ControlCard } from "./ControlCard.jsx";
 import { PillSwitch } from "./PillSwitch.jsx";
-<<<<<<< HEAD
-import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL, DEFAULT_SPECULAR, DEFAULT_PARALLAX } from "./controls.js";
-=======
-import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL, DEFAULT_SPECULAR, DEFAULT_OCCLUSION } from "./controls.js";
->>>>>>> add-occlusion-map
+import { DEFAULT_LIGHT_CONTROLS, DEFAULT_NORMAL, DEFAULT_SPECULAR, DEFAULT_PARALLAX, DEFAULT_PREVIEW } from "./controls.js";
 
 const PIPELINES = [
   { id: "procedural", label: "Procedural" },
@@ -18,21 +14,13 @@ const TABS = {
     { id: "light", label: "Light" },
     { id: "normal", label: "Normal" },
     { id: "specular", label: "Specular" },
-<<<<<<< HEAD
     { id: "parallax", label: "Parallax" },
-=======
-    { id: "occlusion", label: "Occlusion" },
->>>>>>> add-occlusion-map
   ],
   ai: [
     { id: "light", label: "Light" },
     { id: "ai", label: "AI" },
     { id: "specular", label: "Specular" },
-<<<<<<< HEAD
     { id: "parallax", label: "Parallax" },
-=======
-    { id: "occlusion", label: "Occlusion" },
->>>>>>> add-occlusion-map
   ],
 };
 
@@ -51,15 +39,12 @@ export function ControlsPanel({
   onNormalControlsChange,
   specularControls,
   onSpecularControlsChange,
-<<<<<<< HEAD
   parallaxControls,
   onParallaxControlsChange,
-=======
-  occlusionControls,
-  onOcclusionControlsChange,
->>>>>>> add-occlusion-map
   lightControls,
   onLightControlsChange,
+  previewControls = DEFAULT_PREVIEW,
+  onPreviewControlsChange,
   aiControls,
   onAiControlsChange,
   onGenerateAI,
@@ -71,11 +56,7 @@ export function ControlsPanel({
   // Specular/Parallax apply to both pipelines — these raw maps don't depend on
   // how the normal was produced, so their sliders live in both tabs.
   const showSpecular = tab === "specular";
-<<<<<<< HEAD
   const showParallax = tab === "parallax";
-=======
-  const showOcclusion = tab === "occlusion";
->>>>>>> add-occlusion-map
   const showAi = pipeline === "ai" && tab === "ai";
   const parallaxIsBinary = parallaxControls.parallaxType !== "heightmap";
 
@@ -342,7 +323,6 @@ export function ControlsPanel({
       </div>
       )}
 
-<<<<<<< HEAD
       {showParallax && (
       <div
         class="control-panel active"
@@ -447,97 +427,32 @@ export function ControlsPanel({
           />
         </ControlCard>
 
+        <ControlCard title="Lit preview">
+          <RangeRow
+            label="Preview depth"
+            id="previewParallaxDepth"
+            min={0}
+            max={100}
+            value={previewControls.previewParallaxDepth}
+            onChange={(v) => onPreviewControlsChange({ previewParallaxDepth: v })}
+            format={(v) => (v > 0 ? (v / 1000).toFixed(3) : "Off")}
+          />
+          <p class="hint">Drag the Lit/Split preview to tilt the view. Depth is preview-only (not baked into the map).</p>
+        </ControlCard>
+
         <ControlCard title="Options">
           <div class="toggles">
             <ToggleRow
               id="parallaxInvert"
               checked={parallaxControls.parallaxInvert}
               onChange={(v) => onParallaxControlsChange({ parallaxInvert: v })}
-=======
-      {showOcclusion && (
-      <div
-        class="control-panel active"
-        id="occlusionPanel"
-        role="tabpanel"
-        data-control-tab="occlusion"
-      >
-        <ControlCard title="Tone">
-          <RangeRow
-            label="Contrast"
-            id="occlusionContrast"
-            min={1}
-            max={4000}
-            step={1}
-            value={occlusionControls.occlusionContrast}
-            onChange={(v) => onOcclusionControlsChange({ occlusionContrast: v })}
-            format={(v) => (v / 1000).toFixed(3)}
-          />
-          <RangeRow
-            label="Threshold"
-            id="occlusionThresh"
-            min={0}
-            max={255}
-            value={occlusionControls.occlusionThresh}
-            onChange={(v) => onOcclusionControlsChange({ occlusionThresh: v })}
-          />
-          <RangeRow
-            label="Brightness"
-            id="occlusionBright"
-            min={-255}
-            max={255}
-            value={occlusionControls.occlusionBright}
-            onChange={(v) => onOcclusionControlsChange({ occlusionBright: v })}
-          />
-          <RangeRow
-            label="Blur"
-            id="occlusionBlur"
-            min={0}
-            max={50}
-            value={occlusionControls.occlusionBlur}
-            onChange={(v) => onOcclusionControlsChange({ occlusionBlur: v })}
-          />
-        </ControlCard>
-
-        {occlusionControls.occlusionDistanceMode && (
-        <ControlCard title="Distance">
-          <RangeRow
-            label="Falloff"
-            id="occlusionDistance"
-            min={0}
-            max={1024}
-            value={occlusionControls.occlusionDistance}
-            onChange={(v) => onOcclusionControlsChange({ occlusionDistance: v })}
-          />
-        </ControlCard>
-        )}
-
-        <ControlCard title="Options">
-          <div class="toggles">
-            <ToggleRow
-              id="occlusionDistanceMode"
-              checked={occlusionControls.occlusionDistanceMode}
-              onChange={(v) => onOcclusionControlsChange({ occlusionDistanceMode: v })}
-            >
-              Distance mode
-            </ToggleRow>
-            <ToggleRow
-              id="occlusionInvert"
-              checked={occlusionControls.occlusionInvert}
-              onChange={(v) => onOcclusionControlsChange({ occlusionInvert: v })}
->>>>>>> add-occlusion-map
             >
               Invert
             </ToggleRow>
             <ToggleRow
-<<<<<<< HEAD
               id="parallaxUseAlpha"
               checked={parallaxControls.useAlpha}
               onChange={(v) => onParallaxControlsChange({ useAlpha: v })}
-=======
-              id="occlusionUseAlpha"
-              checked={occlusionControls.useAlpha}
-              onChange={(v) => onOcclusionControlsChange({ useAlpha: v })}
->>>>>>> add-occlusion-map
             >
               Use alpha
             </ToggleRow>
@@ -646,8 +561,5 @@ export function ControlsPanel({
 ControlsPanel.defaultLightControls = DEFAULT_LIGHT_CONTROLS;
 ControlsPanel.defaultNormalControls = DEFAULT_NORMAL;
 ControlsPanel.defaultSpecularControls = DEFAULT_SPECULAR;
-<<<<<<< HEAD
 ControlsPanel.defaultParallaxControls = DEFAULT_PARALLAX;
-=======
-ControlsPanel.defaultOcclusionControls = DEFAULT_OCCLUSION;
->>>>>>> add-occlusion-map
+ControlsPanel.defaultPreviewControls = DEFAULT_PREVIEW;
