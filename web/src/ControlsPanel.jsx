@@ -58,7 +58,6 @@ export function ControlsPanel({
   onGenerateAI,
   aiBusy,
   aiReady,
-  onDetectPixelSize,
 }) {
   const tabs = TABS[pipeline] || TABS.procedural;
   const showNormal = pipeline === "procedural" && tab === "normal";
@@ -119,14 +118,7 @@ export function ControlsPanel({
             onChange={(v) => onLightControlsChange({ pixelSize: v })}
             format={(v) => (v <= 1 ? "1 (off)" : `${v}×`)}
           />
-          <button
-            type="button"
-            disabled={!onDetectPixelSize}
-            onClick={onDetectPixelSize}
-            title="Detect nearest-neighbour upscale factor from uniform blocks"
-          >
-            Detect pixel size
-          </button>
+          <p class="hint">Auto-detected on load from solid-color runs; override if needed.</p>
         </ControlCard>
 
         <ControlCard title="Diffuse">

@@ -54,6 +54,57 @@ check("detectPixelSize finds nearest-neighbour upscale", () => {
   assert.equal(blocksAreUniform(src, 3), false);
 });
 
+check("detectPixelSize returns 1 for non-blocky noise", () => {
+  const data = new Uint8ClampedArray(4 * 4 * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = (i * 37) & 255;
+    data[i + 1] = (i * 91) & 255;
+    data[i + 2] = (i * 13) & 255;
+    data[i + 3] = 255;
+  }
+  assert.equal(detectPixelSize({ width: 4, height: 4, data }), 1);
+});
+
+check("detectPixelSize returns 1 for solid fill", () => {
+  const data = new Uint8ClampedArray(8 * 8 * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 40;
+    data[i + 1] = 40;
+    data[i + 2] = 40;
+    data[i + 3] = 255;
+  }
+  assert.equal(detectPixelSize({ width: 8, height: 8, data }), 1);
+});
+
+check("detectPixelSize finds scale via run GCD (multiples of art pixel)", () => {
+  // 3×3 logical with scale 3 → runs of 3 (and 6 for adjacent same? checker so 3)
+  assert.equal(detectPixelSize(makeUpscaledChecker(3)), 3);
+  assert.equal(detectPixelSize(makeUpscaledChecker(8)), 8);
+});
+
+check("detectPixelSize still works with a cropped remainder strip", () => {
+  // 4× upscale then drop the last column so width is not divisible by 4.
+  const full = makeUpscaledChecker(4); // 8×8
+  const W = 7;
+  const H = 8;
+  const data = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y += 1) {
+    for (let x = 0; x < W; x += 1) {
+      const si = (y * full.width + x) * 4;
+      const di = (y * W + x) * 4;
+      data[di] = full.data[si];
+      data[di + 1] = full.data[si + 1];
+      data[di + 2] = full.data[si + 2];
+      data[di + 3] = full.data[si + 3];
+    }
+  }
+  // Run GCD of 4 and residual 3 → 1, then block fallback should still find 4
+  // on the complete columns (floor(7/4)=1 full block column… actually only one
+  // block column of width 4, height has 2 blocks). blocksAreUniform with s=4
+  // checks floor(7/4)=1 × floor(8/4)=2 blocks — those are uniform → 4.
+  assert.equal(detectPixelSize({ width: W, height: H, data }), 4);
+});
+
 check("downsample + upsample restores block structure", () => {
   const src = makeUpscaledChecker(4);
   const low = downsampleRgba(src, 4);

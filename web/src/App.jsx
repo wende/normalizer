@@ -118,20 +118,6 @@ export function App() {
     setAiControls((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  const onDetectPixelSize = useCallback(() => {
-    if (!source) {
-      setStatus("Load an image first.");
-      return;
-    }
-    const detected = detectPixelSize(source, { tolerance: 2 });
-    setLightControls((prev) => ({ ...prev, pixelSize: detected }));
-    setStatus(
-      detected > 1
-        ? `Detected pixel size ${detected}×`
-        : "No upscale detected (pixel size 1)",
-    );
-  }, [source]);
-
   // Switch pipeline, keeping the controls tab valid for the new pipeline
   // (Normal <-> AI are pipeline-specific; Light and Specular are shared).
   const onPipelineChange = useCallback((next) => {
@@ -303,12 +289,19 @@ export function App() {
 
   const loadFromImage = useCallback(async (image, { aiNormalImage = null } = {}) => {
     const data = readSourceFromImage(image);
+    // Auto-detect nearest-neighbour art scale from solid-color run GCDs so Soft
+    // / Blur respect fake resolution without a manual Pixel size tweak.
+    const detected = detectPixelSize(data, { tolerance: 2 });
     setSource(data);
+    setLightControls((prev) => (
+      prev.pixelSize === detected ? prev : { ...prev, pixelSize: detected }
+    ));
     // Sample ships a precomputed DeepBump map; uploads clear AI until regenerate.
     setAiOverlay(aiNormalImage ? readSourceFromImage(aiNormalImage) : null);
     if (aiNormalImage) setPipeline("ai");
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
     setViewTilt({ x: 0, y: 0 });
+    return { width: data.width, height: data.height, pixelSize: detected };
   }, []);
 
   const loadSample = useCallback(async () => {
@@ -318,8 +311,9 @@ export function App() {
         decodeImage(SAMPLE_SRC),
         decodeImage(SAMPLE_AI_NORMAL_SRC),
       ]);
-      await loadFromImage(image, { aiNormalImage });
-      setStatus(`${image.naturalWidth}x${image.naturalHeight} - sample ready`);
+      const { width, height, pixelSize } = await loadFromImage(image, { aiNormalImage });
+      const scaleNote = pixelSize > 1 ? `, pixel size ${pixelSize}×` : "";
+      setStatus(`${width}x${height} - sample ready${scaleNote}`);
     } catch (error) {
       setStatus(error.message || SAMPLE_LOAD_ERROR);
     }
@@ -333,7 +327,9 @@ export function App() {
       const image = new Image();
       image.src = url;
       await image.decode();
-      await loadFromImage(image);
+      const { width, height, pixelSize } = await loadFromImage(image);
+      const scaleNote = pixelSize > 1 ? `, pixel size ${pixelSize}×` : "";
+      setStatus(`${width}x${height}${scaleNote}`);
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -391,7 +387,6 @@ export function App() {
           onGenerateAI={onGenerateAI}
           aiBusy={aiBusy}
           aiReady={!!aiOverlay}
-          onDetectPixelSize={onDetectPixelSize}
         />
       </section>
     </main>
