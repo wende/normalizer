@@ -84,7 +84,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 - `docs/NORMALIZER_FEATURES.md` — implement/defer/drop decisions; the active roadmap.
 - `docs/JS_CORE_MIGRATION.md` — engineering detail for retiring the C++ core; pain points (blur divergence, straight vs premultiplied alpha, erode/dilate, EDT caching).
 - `docs/REWRITE_PLAN.md` — original Qt→modern rewrite plan; largely superseded for WASM/Tauri/React paths, still authoritative for parameter ranges/defaults.
-- `docs/SPECULAR_MAP_PLAN.md`, `docs/PARALLAX_MAP_PLAN.md`, `docs/OCCLUSION_MAP_PLAN.md` — per-map porting plans.
+- `docs/PREVIEW_GOLDEN_STRATEGY.md` — open decision on the preview golden cases.
 - `tests/golden/README.md` — golden harness usage.
 
 ## Things to know before editing
