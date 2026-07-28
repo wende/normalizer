@@ -40,6 +40,7 @@ test.describe("Normal Map Generator UI", () => {
     await expect(page.locator("#lightPanel")).toBeVisible();
     await expect(page.locator("#normalPanel")).toHaveCount(0);
 
+    await page.locator('.pill-switch button:has-text("Procedural")').click();
     await page.locator('.pill-switch button:has-text("Normal")').click();
     await expect(page.locator("#normalPanel")).toBeVisible();
     await expect(page.locator("#lightPanel")).toHaveCount(0);
