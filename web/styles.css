@@ -199,7 +199,8 @@ input[type="range"]::-moz-range-thumb {
   gap: 8px;
 }
 
-#imageInput {
+#imageInput,
+#projectInput {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -226,6 +227,11 @@ button,
 button:hover,
 .file-button:hover {
   border-color: oklch(0.75 0.01 90);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 #exportButton {

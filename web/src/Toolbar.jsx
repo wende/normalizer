@@ -9,8 +9,18 @@ const FOLDER_ICON = (
   </svg>
 );
 
-export function Toolbar({ onOpenFile, onLoadSample, onExport, onExportPack, exportPackBusy }) {
+export function Toolbar({
+  onOpenFile,
+  onOpenProject,
+  onLoadSample,
+  onSaveProject,
+  onExport,
+  onExportPack,
+  exportPackBusy,
+  canSaveProject = false,
+}) {
   const fileRef = useRef(null);
+  const projectRef = useRef(null);
   return (
     <header class="toolbar">
       <div class="toolbar-left">
@@ -29,12 +39,36 @@ export function Toolbar({ onOpenFile, onLoadSample, onExport, onExportPack, expo
             ref={fileRef}
             type="file"
             accept="image/png,image/jpeg,image/webp"
-            onChange={(e) => onOpenFile(e.currentTarget.files?.[0])}
+            onChange={(e) => {
+              onOpenFile(e.currentTarget.files?.[0]);
+              e.currentTarget.value = "";
+            }}
+          />
+          <label class="file-button" for="projectInput">
+            <span>Open Project</span>
+          </label>
+          <input
+            id="projectInput"
+            ref={projectRef}
+            type="file"
+            accept=".normalizer,application/zip"
+            onChange={(e) => {
+              onOpenProject(e.currentTarget.files?.[0]);
+              e.currentTarget.value = "";
+            }}
           />
           <button id="sampleButton" type="button" onClick={onLoadSample}>Sample</button>
         </div>
       </div>
       <div class="actions">
+        <button
+          id="saveProjectButton"
+          type="button"
+          onClick={onSaveProject}
+          disabled={!canSaveProject}
+        >
+          Save Project
+        </button>
         <button id="exportButton" type="button" onClick={onExport}>Export PNG</button>
         <button
           id="exportPackButton"

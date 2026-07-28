@@ -34,6 +34,13 @@ import {
   imageDataToPngBytes,
   singleMapFilename,
 } from "./exportPack.js";
+import {
+  buildProjectArchive,
+  downloadProject,
+  pngBytesToImageData,
+  suggestProjectFilename,
+  unpackProjectArchive,
+} from "./projectFile.js";
 import { detectPixelSize, pixelateNormalMap } from "shared/pixelScale.js";
 
 const SAMPLE_SRC = "./demo.png";
@@ -41,6 +48,7 @@ const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
 const LIGHT_SPRITE_SRC = "./normalizer_texture.png";
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
 const SAMPLE_BASE_NAME = "demo";
+const HYDRATE_SKIP_MS = 100;
 
 async function decodeImage(src) {
   const image = new Image();
@@ -74,6 +82,7 @@ export function App() {
   const [aiControls, setAiControls] = useState(DEFAULT_AI_CONTROLS);
   const [sourceName, setSourceName] = useState(SAMPLE_BASE_NAME);
   const [exportPackBusy, setExportPackBusy] = useState(false);
+  const [projectFilename, setProjectFilename] = useState("project.normalizer");
   const lastRect = useRef(null);
   const draggingLight = useRef(false);
   const lightSprite = useRef(null);
@@ -82,6 +91,22 @@ export function App() {
   const parallaxTimer = useRef(0);
   const occlusionTimer = useRef(0);
   const aiWorker = useRef(null);
+  // When hydrating a .normalizer, skip the next recompute ticks so embedded
+  // maps are not overwritten by a regenerate from the restored sliders.
+  const ignoreRecompute = useRef(false);
+  const ignoreRecomputeTimer = useRef(0);
+
+  const beginHydrate = useCallback(() => {
+    ignoreRecompute.current = true;
+    clearTimeout(generateTimer.current);
+    clearTimeout(specularTimer.current);
+    clearTimeout(parallaxTimer.current);
+    clearTimeout(occlusionTimer.current);
+    clearTimeout(ignoreRecomputeTimer.current);
+    ignoreRecomputeTimer.current = setTimeout(() => {
+      ignoreRecompute.current = false;
+    }, HYDRATE_SKIP_MS);
+  }, []);
 
   // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
   // tweaks (strength/smooth/steps/pixelSize) are applied on top to produce the
@@ -209,9 +234,10 @@ export function App() {
   // drags never block the UI thread; the AI map is kept entirely separate.
   const { request: requestNormal } = useNormalWorker();
   useEffect(() => {
-    if (!source) return;
+    if (!source || ignoreRecompute.current) return;
     clearTimeout(generateTimer.current);
     generateTimer.current = setTimeout(() => {
+      if (ignoreRecompute.current) return;
       const params = buildNormalParams(normalControls, lightControls.pixelSize);
       requestNormal(
         { width: source.width, height: source.height, data: source.data },
@@ -230,9 +256,10 @@ export function App() {
 
   // Specular map — recomputed (debounced) from the source + specular sliders.
   useEffect(() => {
-    if (!source) return;
+    if (!source || ignoreRecompute.current) return;
     clearTimeout(specularTimer.current);
     specularTimer.current = setTimeout(() => {
+      if (ignoreRecompute.current) return;
       const params = buildSpecularParams(specularControls, lightControls.pixelSize);
       setSpecularMap(generateSpecular(source, params));
     }, 40);
@@ -241,9 +268,10 @@ export function App() {
 
   // Parallax map — recomputed (debounced) from the source + parallax sliders.
   useEffect(() => {
-    if (!source) return;
+    if (!source || ignoreRecompute.current) return;
     clearTimeout(parallaxTimer.current);
     parallaxTimer.current = setTimeout(() => {
+      if (ignoreRecompute.current) return;
       const params = buildParallaxParams(parallaxControls, lightControls.pixelSize);
       setParallaxMap(generateParallax(source, params));
     }, 40);
@@ -251,9 +279,10 @@ export function App() {
   }, [source, parallaxControls, lightControls.pixelSize]);
   // Occlusion map — recomputed (debounced) from the source + occlusion sliders.
   useEffect(() => {
-    if (!source) return;
+    if (!source || ignoreRecompute.current) return;
     clearTimeout(occlusionTimer.current);
     occlusionTimer.current = setTimeout(() => {
+      if (ignoreRecompute.current) return;
       const params = buildOcclusionParams(occlusionControls, lightControls.pixelSize);
       setOcclusionMap(generateOcclusion(source, params));
     }, 40);
@@ -314,6 +343,7 @@ export function App() {
     const detected = detectPixelSize(data, { tolerance: 2 });
     setSource(data);
     setSourceName(baseName);
+    setProjectFilename(suggestProjectFilename(baseName));
     setLightControls((prev) => {
       const next = {
         ...prev,
@@ -409,6 +439,96 @@ export function App() {
     source, sourceName, activeNormal, parallaxMap, occlusionMap, specularMap, exportPackBusy,
   ]);
 
+  const onSaveProject = useCallback(async () => {
+    if (!source) {
+      setStatus("Load an image first.");
+      return;
+    }
+    setStatus("Saving project…");
+    try {
+      const bytes = await buildProjectArchive({
+        source,
+        proceduralNormal,
+        specularMap,
+        parallaxMap,
+        occlusionMap,
+        aiOverlay,
+        pipeline,
+        tab,
+        mode,
+        splitRatio,
+        light,
+        viewTilt,
+        normalControls,
+        lightControls,
+        aiControls,
+        specularControls,
+        parallaxControls,
+        occlusionControls,
+      }, imageDataToPngBytes);
+      downloadProject(bytes, projectFilename);
+      setStatus(`Saved ${projectFilename}`);
+    } catch (error) {
+      setStatus(error.message || "Save project failed");
+    }
+  }, [
+    source, proceduralNormal, specularMap, parallaxMap, occlusionMap, aiOverlay,
+    pipeline, tab, mode, splitRatio, light, viewTilt,
+    normalControls, lightControls, aiControls, specularControls, parallaxControls, occlusionControls,
+    projectFilename,
+  ]);
+
+  const onOpenProject = useCallback(async (file) => {
+    if (!file) return;
+    setStatus("Loading project…");
+    try {
+      const buffer = await file.arrayBuffer();
+      const { meta, pngBytes } = unpackProjectArchive(buffer);
+      const decode = async (bytes) => (bytes ? pngBytesToImageData(bytes) : null);
+      const [
+        sourceImage,
+        normalImage,
+        specularImage,
+        parallaxImage,
+        occlusionImage,
+        aiImage,
+      ] = await Promise.all([
+        decode(pngBytes.source),
+        decode(pngBytes.normal),
+        decode(pngBytes.specular),
+        decode(pngBytes.parallax),
+        decode(pngBytes.occlusion),
+        decode(pngBytes.aiNormal),
+      ]);
+      if (!sourceImage) throw new Error("Project is missing source.png");
+
+      beginHydrate();
+      setSource(sourceImage);
+      setSourceName(file.name || SAMPLE_BASE_NAME);
+      setProceduralNormal(normalImage);
+      setSpecularMap(specularImage);
+      setParallaxMap(parallaxImage);
+      setOcclusionMap(occlusionImage);
+      setAiOverlay(aiImage);
+      setPipeline(meta.pipeline);
+      setTab(meta.tab);
+      setMode(meta.mode);
+      setSplitRatio(meta.splitRatio);
+      setLight(meta.light);
+      setViewTilt(meta.viewTilt);
+      setNormalControls({ ...DEFAULT_NORMAL, ...meta.normal });
+      setLightControls({ ...DEFAULT_LIGHT_CONTROLS, ...meta.lightControls });
+      setAiControls({ ...DEFAULT_AI_CONTROLS, ...meta.ai });
+      setSpecularControls({ ...DEFAULT_SPECULAR, ...meta.specular });
+      setParallaxControls({ ...DEFAULT_PARALLAX, ...meta.parallax });
+      setOcclusionControls({ ...DEFAULT_OCCLUSION, ...meta.occlusion });
+      setProjectFilename(suggestProjectFilename(file.name));
+      setStatus(`${sourceImage.width}x${sourceImage.height} - project loaded`);
+    } catch (error) {
+      setStatus(error.message || "Open project failed");
+    }
+  }, [beginHydrate]);
+
   // Initial sample load.
   useEffect(() => {
     loadSample();
@@ -418,7 +538,10 @@ export function App() {
     <main class="app">
       <Toolbar
         onOpenFile={onOpenFile}
+        onOpenProject={onOpenProject}
         onLoadSample={loadSample}
+        onSaveProject={onSaveProject}
+        canSaveProject={!!source}
         onExport={onExportPng}
         onExportPack={onExportPack}
         exportPackBusy={exportPackBusy}
