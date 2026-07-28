@@ -405,6 +405,9 @@ button:hover,
   margin: 0;
   color: var(--label);
   font-size: 14px;
+  /* Avoid selecting the label/value while dragging on touch devices. */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .range-row > span:first-child {
