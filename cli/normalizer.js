@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * normalizer CLI — normal-, specular-, and parallax-map generation.
+ * normalizer CLI — normal-, specular-, parallax-, and occlusion-map generation.
  *
  * Derived from Laigter's GPL-3.0 logic; mirrors the argument/exit contract of
  * core/tools/laigter_core_cli.cpp so scripts/run_core_cases.py can drive either
@@ -12,6 +12,7 @@ import pngjs from "pngjs";
 import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
 import { generateSpecularMap, DEFAULT_SPECULAR_PARAMS } from "../shared/specular.js";
 import { generateParallaxMap, DEFAULT_PARALLAX_PARAMS } from "../shared/parallax.js";
+import { generateOcclusionMap, DEFAULT_OCCLUSION_PARAMS } from "../shared/occlusion.js";
 
 const { PNG } = pngjs;
 
@@ -22,6 +23,7 @@ const USAGE = [
   "  normal                           generate a tangent-space normal map",
   "  specular                         generate a specular reflectivity map",
   "  parallax                         generate a parallax (height) map",
+  "  occlusion                        generate an ambient-occlusion map",
   "",
   "normal options:",
   "  --normal-depth <int>             emboss strength (default 250)",
@@ -54,6 +56,16 @@ const USAGE = [
   "  --parallax-contrast <float>      heightmap contrast (default 1.0)",
   "  --parallax-invert                invert the map",
   "  --use-parallax-alpha             copy the source alpha into the output",
+  "",
+  "occlusion options:",
+  "  --occlusion-thresh <int>         threshold + contrast pivot (default 1)",
+  "  --occlusion-contrast <float>     contrast (default 1.0)",
+  "  --occlusion-bright <int>         brightness offset (default 16)",
+  "  --occlusion-blur <int>           blur sigma (default 3)",
+  "  --occlusion-distance-mode <0|1>  distance-transform AO (default 1)",
+  "  --occlusion-distance <int>       distance falloff scale (default 10)",
+  "  --occlusion-invert               invert the map",
+  "  --use-occlusion-alpha            copy the source alpha into the output",
 ].join("\n");
 
 function failUsage(message) {
@@ -210,10 +222,47 @@ function parseParallaxFlags(args) {
   return params;
 }
 
+function parseOcclusionFlags(args) {
+  const params = { ...DEFAULT_OCCLUSION_PARAMS };
+  for (let i = 3; i < args.length; i += 1) {
+    const arg = args[i];
+    switch (arg) {
+      case "--occlusion-thresh":
+        params.occlusionThresh = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-contrast":
+        params.occlusionContrast = parseFloatNumber(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-bright":
+        params.occlusionBright = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-blur":
+        params.occlusionBlur = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-distance-mode":
+        params.occlusionDistanceMode = parseInt32(requireValue(args, (i += 1), arg), arg) !== 0;
+        break;
+      case "--occlusion-distance":
+        params.occlusionDistance = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--occlusion-invert":
+        params.occlusionInvert = true;
+        break;
+      case "--use-occlusion-alpha":
+        params.useAlpha = true;
+        break;
+      default:
+        fail(`unknown option: ${arg}`);
+    }
+  }
+  return params;
+}
+
 const PARSERS = {
   normal: parseNormalFlags,
   specular: parseSpecularFlags,
   parallax: parseParallaxFlags,
+  occlusion: parseOcclusionFlags,
 };
 
 function parseArgs(args) {
@@ -241,6 +290,7 @@ const GENERATORS = {
   normal: generateNormalMap,
   specular: generateSpecularMap,
   parallax: generateParallaxMap,
+  occlusion: generateOcclusionMap,
 };
 
 const { command, inputPath, outputPath, params } = parseArgs(process.argv.slice(2));

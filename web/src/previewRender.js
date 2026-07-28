@@ -7,6 +7,7 @@
 import { generateNormalMap } from "shared/normal.js";
 import { generateSpecularMap } from "shared/specular.js";
 import { generateParallaxMap } from "shared/parallax.js";
+import { generateOcclusionMap } from "shared/occlusion.js";
 import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "shared/preview.js";
 
 export function hexToRgb01(hex) {
@@ -141,6 +142,11 @@ export function generateParallax(source, params) {
   return new ImageData(out.data, out.width, out.height);
 }
 
+export function generateOcclusion(source, params) {
+  const out = generateOcclusionMap(source, params);
+  return new ImageData(out.data, out.width, out.height);
+}
+
 export function renderLit(source, normal, lightSettings, toon, specular = null) {
   const out = buildLitPreview(source, normal, lightSettings, toon, specular);
   return new ImageData(out.data, out.width, out.height);
@@ -225,6 +231,7 @@ export function drawPreview({
   normal,
   specular,
   parallax,
+  occlusion,
   litCache,
   mode,
   pipeline,
@@ -250,10 +257,11 @@ export function drawPreview({
     return null;
   }
 
-  // Only the Base view renders without a generated map. Specular/Parallax need
-  // their own map; Split/Lit/Normal need a normal map — and in the AI pipeline
-  // "no normal yet" means "not generated", so show a hint rather than a blank.
-  const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax";
+  // Only the Base view renders without a generated map. Specular/Parallax/
+  // Occlusion need their own map; Split/Lit/Normal need a normal map — and in
+  // the AI pipeline "no normal yet" means "not generated", so show a hint
+  // rather than a blank.
+  const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax" && mode !== "occlusion";
   if (needsNormal && !normal) {
     if (pipeline === "ai") {
       drawAiPlaceholder(ctx, canvas);
@@ -266,6 +274,9 @@ export function drawPreview({
   if (mode === "parallax" && !parallax) {
     return null;
   }
+  if (mode === "occlusion" && !occlusion) {
+    return null;
+  }
 
   const rect = fitRect(source.width, source.height, canvas.width - 48, canvas.height - 48);
   if (mode === "base") {
@@ -274,6 +285,8 @@ export function drawPreview({
     drawImageData(ctx, specular, rect, pixelated);
   } else if (mode === "parallax") {
     drawImageData(ctx, parallax, rect, pixelated);
+  } else if (mode === "occlusion") {
+    drawImageData(ctx, occlusion, rect, pixelated);
   } else if (mode === "lit") {
     drawImageData(ctx, litCache || normal, rect, pixelated);
   } else if (mode === "normal") {
