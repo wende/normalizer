@@ -7,6 +7,7 @@ import {
   detectPixelSize,
   downsampleRgba,
   normalizePixelSize,
+  pixelateNormalMap,
   upsampleNearest,
 } from "../shared/pixelScale.js";
 import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
@@ -183,6 +184,31 @@ check("without pixelSize, soft blur breaks block uniformity", () => {
     biselBlurRadius: 6,
   });
   assert.equal(blocksAreUniform(out, 4, 0), false);
+});
+
+check("pixelateNormalMap snaps an existing normal to art-pixel blocks", () => {
+  // Simulate an AI / smooth normal: different values inside what should be one
+  // art pixel. Post-process must collapse each 4×4 to one unit normal.
+  const width = 8;
+  const height = 8;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const p = (y * width + x) * 4;
+      const bias = x < 4 ? -30 : 30; // left vs right art pixel differ
+      data[p] = 128 + bias + (x % 4) * 4; // varies inside block
+      data[p + 1] = 128 + (y % 4) * 4;
+      data[p + 2] = 255;
+      data[p + 3] = 255;
+    }
+  }
+  assert.equal(blocksAreUniform({ width, height, data }, 4, 0), false);
+  const snapped = pixelateNormalMap({ width, height, data }, 4);
+  assert.equal(blocksAreUniform(snapped, 4, 0), true);
+  // Adjacent art pixels (different average) should still differ.
+  const left = snapped.data.slice(0, 3);
+  const right = snapped.data.slice(4 * 4, 4 * 4 + 3);
+  assert.notDeepEqual([...left], [...right]);
 });
 
 console.log(`\n${passed} checks passed`);

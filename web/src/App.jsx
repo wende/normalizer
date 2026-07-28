@@ -28,7 +28,7 @@ import {
 } from "./previewRender.js";
 import { adjustNormalMap } from "./normalAdjust.js";
 import { useNormalWorker } from "./useNormalWorker.js";
-import { detectPixelSize } from "shared/pixelScale.js";
+import { detectPixelSize, pixelateNormalMap } from "shared/pixelScale.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
@@ -75,21 +75,32 @@ export function App() {
   const aiWorker = useRef(null);
 
   // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
-  // tweaks (strength/smooth/steps) are applied on top to produce the AI normal.
-  // No re-inference — this recomputes instantly as the Adjust sliders move.
+  // tweaks (strength/smooth/steps/pixelSize) are applied on top to produce the
+  // AI normal. No re-inference — this recomputes instantly as sliders move.
   const aiNormal = useMemo(() => {
     if (!aiOverlay) return null;
     return adjustNormalMap(aiOverlay, {
       strength: aiControls.strength / 100,
       smooth: aiControls.smooth,
       steps: aiControls.steps,
+      pixelSize: lightControls.pixelSize,
     });
-  }, [aiOverlay, aiControls.strength, aiControls.smooth, aiControls.steps]);
+  }, [aiOverlay, aiControls.strength, aiControls.smooth, aiControls.steps, lightControls.pixelSize]);
+
+  // Procedural normals already honour pixelSize inside generateNormalMap; snap
+  // again so AI and procedural share the same block-facet look (idempotent when
+  // already block-constant). Also covers any worker path that omitted the flag.
+  const proceduralDisplay = useMemo(() => {
+    if (!proceduralNormal) return null;
+    if (!(lightControls.pixelSize > 1)) return proceduralNormal;
+    const snapped = pixelateNormalMap(proceduralNormal, lightControls.pixelSize);
+    return new ImageData(snapped.data, snapped.width, snapped.height);
+  }, [proceduralNormal, lightControls.pixelSize]);
 
   // The active normal depends entirely on the pipeline — the procedural and AI
   // maps are never mixed. Everything downstream (Lit/Split/Normal views, Export)
   // reads this one value.
-  const activeNormal = pipeline === "ai" ? aiNormal : proceduralNormal;
+  const activeNormal = pipeline === "ai" ? aiNormal : proceduralDisplay;
 
   // Load the light sprite once on mount so it's ready when drawPreview runs.
   useEffect(() => {

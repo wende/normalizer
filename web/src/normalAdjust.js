@@ -5,11 +5,15 @@
  * wrapper returns an ImageData for the canvas / lit preview.
  *
  * Order: decode -> optional smooth (blur the vector field) -> scale tangent XY
- * by `strength` -> optional steps quantize -> renormalize -> re-encode.
- *   strength  1 = as generated, >1 = deeper/steeper relief, 0 = flat
- *   smooth    post blur radius in px (softens detail/noise)
- *   steps     quantize the normal direction for flat facets (0 = off)
+ * by `strength` -> optional steps quantize -> optional pixelSize block snap ->
+ * renormalize -> re-encode.
+ *   strength   1 = as generated, >1 = deeper/steeper relief, 0 = flat
+ *   smooth     post blur radius in px (softens detail/noise)
+ *   steps      quantize the normal direction for flat facets (0 = off)
+ *   pixelSize  snap each N×N block to one averaged unit normal (1 = off)
  */
+
+import { normalizePixelSize, pixelateNormalMap } from "shared/pixelScale.js";
 
 function clamp8(v) {
   let i = (v * 255) | 0;
@@ -121,6 +125,11 @@ export function adjustNormalData(data, width, height, params = {}) {
     out[p + 2] = clamp8(z * 0.5 + 0.5);
     out[p + 3] = data[p + 3];
   }
+
+  const pixelSize = normalizePixelSize(params.pixelSize);
+  if (pixelSize > 1) {
+    return pixelateNormalMap({ width, height, data: out }, pixelSize).data;
+  }
   return out;
 }
 
@@ -128,7 +137,8 @@ export function isIdentityAdjust(params = {}) {
   return (
     (params.strength ?? 1) === 1 &&
     !(Math.round(params.smooth ?? 0) > 0) &&
-    !(Math.round(params.steps ?? 0) >= 1)
+    !(Math.round(params.steps ?? 0) >= 1) &&
+    !(normalizePixelSize(params.pixelSize) > 1)
   );
 }
 

@@ -277,3 +277,77 @@ export function atPixelScale(source, pixelSize, generate) {
   const result = generate(low);
   return upsampleNearest(result, source.width, source.height, s);
 }
+
+function clampNormal8(v) {
+  let i = (v * 255) | 0;
+  if (i < 0) i = 0;
+  else if (i > 255) i = 255;
+  return i;
+}
+
+/**
+ * Post-process a tangent-space normal map so each pixelSize×pixelSize block
+ * shares one unit normal (average decoded XYZ, renormalize, fill). Needed for
+ * AI / already-generated normals that never ran through generateNormalMap's
+ * art-scale path. pixelSize <= 1 returns a copy of the input record.
+ */
+export function pixelateNormalMap(normal, pixelSize) {
+  const s = normalizePixelSize(pixelSize);
+  const { width, height, data } = normal;
+  if (s <= 1) {
+    return {
+      width,
+      height,
+      data: data instanceof Uint8ClampedArray
+        ? new Uint8ClampedArray(data)
+        : new Uint8ClampedArray(data),
+    };
+  }
+
+  const out = new Uint8ClampedArray(width * height * 4);
+  const wBlocks = Math.ceil(width / s);
+  const hBlocks = Math.ceil(height / s);
+
+  for (let by = 0; by < hBlocks; by += 1) {
+    for (let bx = 0; bx < wBlocks; bx += 1) {
+      const x0 = bx * s;
+      const y0 = by * s;
+      const x1 = Math.min(width, x0 + s);
+      const y1 = Math.min(height, y0 + s);
+      let sx = 0;
+      let sy = 0;
+      let sz = 0;
+      let n = 0;
+      for (let y = y0; y < y1; y += 1) {
+        for (let x = x0; x < x1; x += 1) {
+          const p = (y * width + x) * 4;
+          sx += data[p] / 127.5 - 1;
+          sy += data[p + 1] / 127.5 - 1;
+          sz += data[p + 2] / 127.5 - 1;
+          n += 1;
+        }
+      }
+      let nx = sx / n;
+      let ny = sy / n;
+      let nz = sz / n;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      nx /= len;
+      ny /= len;
+      nz /= len;
+      const r = clampNormal8(nx * 0.5 + 0.5);
+      const g = clampNormal8(ny * 0.5 + 0.5);
+      const b = clampNormal8(nz * 0.5 + 0.5);
+      for (let y = y0; y < y1; y += 1) {
+        for (let x = x0; x < x1; x += 1) {
+          const p = (y * width + x) * 4;
+          out[p] = r;
+          out[p + 1] = g;
+          out[p + 2] = b;
+          out[p + 3] = data[p + 3];
+        }
+      }
+    }
+  }
+
+  return { width, height, data: out };
+}
