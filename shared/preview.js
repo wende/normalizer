@@ -1,6 +1,8 @@
 /*
  * Lit-preview rendering — derived from laigter/shaders/fshader.glsl
- * view_mode==5 with lightNum=1, parallax off, occlusion=1.
+ * view_mode==5 with lightNum=1, parallax off. Occlusion multiplies ambient only
+ * (upstream: `ambientColor * ambientIntensity * occlusion`); omit the map to
+ * keep ambient unoccluded (equivalent to occlusion=1).
  *
  * Pure function over plain { width, height, data } records — no DOM, no Node
  * APIs. Mirrors shared/normal.js: callers wrap the returned record as ImageData
@@ -66,9 +68,11 @@ function resolveLightSettings(settings = {}) {
  * @param {boolean} [toon=false]  Apply the toon-shading thresholds.
  * @param {{width:number,height:number,data:Uint8ClampedArray}|null} [specularMap=null]
  *   Optional specular reflectivity map; defaults to full reflectivity.
+ * @param {{width:number,height:number,data:Uint8ClampedArray}|null} [occlusionMap=null]
+ *   Optional AO map (grayscale in R); multiplies ambient only. Defaults to 1.
  * @returns {{width:number,height:number,data:Uint8ClampedArray}}
  */
-export function buildLitPreview(source, normal, light, toon = false, specularMap = null) {
+export function buildLitPreview(source, normal, light, toon = false, specularMap = null, occlusionMap = null) {
   const width = source.width;
   const heightPx = source.height;
   const lightZ = light.z * 1000;
@@ -122,10 +126,11 @@ export function buildLitPreview(source, normal, light, toon = false, specularMap
       const specularG = settings.specularIntensity * spec * sg * specMapG;
       const specularB = settings.specularIntensity * spec * sb * specMapB;
 
+      const occlusion = occlusionMap ? occlusionMap.data[off] / 255 : 1;
       const [ar, ag, ab] = settings.ambientColor;
-      const ambientR = ar * settings.ambientIntensity;
-      const ambientG = ag * settings.ambientIntensity;
-      const ambientB = ab * settings.ambientIntensity;
+      const ambientR = ar * settings.ambientIntensity * occlusion;
+      const ambientG = ag * settings.ambientIntensity * occlusion;
+      const ambientB = ab * settings.ambientIntensity * occlusion;
 
       const shadeR = diffuseR + specularR + ambientR;
       const shadeG = diffuseG + specularG + ambientG;

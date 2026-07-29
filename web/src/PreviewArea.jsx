@@ -60,7 +60,7 @@ function cpuFallback(overlay, octx, drawArgs) {
     source, normal, specular, parallax, occlusion, mode, pipeline, light, pixelated, draggingLight, lightSprite,
     lightSettings, toon, splitRatio, viewTilt, heightScale,
   } = drawArgs;
-  const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular) : null;
+  const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular, occlusion) : null;
   return drawPreview({
     canvas: overlay,
     ctx: octx,
