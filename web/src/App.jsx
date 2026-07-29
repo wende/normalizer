@@ -301,8 +301,11 @@ export function App() {
     return () => clearTimeout(occlusionTimer.current);
   }, [source, occlusionControls, lightControls.pixelSize]);
 
-  // Pixel-fixer — auto-detect on source / detect-range changes; reconstruct when
-  // the lattice (pitch/offset) changes. Debounced more than the cheap maps.
+  // Pixel-fixer — ONLY runs when the Pixel Fix tab or preview mode is active.
+  // Detect is opt-in (button) / one-shot on first visit; never on every image
+  // load. Full auto-detect on a 1k² source was blocking the UI for ~10s+.
+  const pixelFixActive = mode === "pixelfix" || tab === "pixelfix";
+
   const runPixelFixDetect = useCallback(() => {
     if (!source) return;
     const params = buildPixelFixerParams({
@@ -311,43 +314,47 @@ export function App() {
       offsetX: -1,
       offsetY: -1,
     });
-    const candidates = detectPixelFix(source, params);
-    setPixelFixCandidates(candidates);
-    if (!candidates.length) {
-      setPixelFixSprite(null);
-      setPixelFixPreview(null);
-      setStatus("Pixel fix: no grid candidates");
-      return;
-    }
-    const idx = Math.min(pixelFixerControls.candidateIndex, candidates.length - 1);
-    const best = candidates[idx];
-    setPixelFixerControls((prev) => ({
-      ...prev,
-      candidateIndex: idx,
-      pitch: best.pitch,
-      offsetX: best.offsetX,
-      offsetY: best.offsetY,
-    }));
-    const { sprite, preview } = reconstructPixelFix(source, {
-      pitch: best.pitch,
-      offsetX: best.offsetX,
-      offsetY: best.offsetY,
-      alphaThreshold: pixelFixerControls.alphaThreshold,
-    });
-    setPixelFixSprite(sprite);
-    setPixelFixPreview(preview);
-    setStatus(`Pixel fix: ${best.cols}×${best.rows} @ pitch ${best.pitch}`);
-  }, [source, pixelFixerControls.minPitch, pixelFixerControls.maxPitch, pixelFixerControls.candidateCount, pixelFixerControls.alphaThreshold, pixelFixerControls.candidateIndex]);
-
-  useEffect(() => {
-    if (!source) return;
-    clearTimeout(pixelFixTimer.current);
-    pixelFixTimer.current = setTimeout(() => {
-      // Auto-detect once per source load / range change when pitch is still 0.
-      if (!pixelFixerControls.pitch) {
-        runPixelFixDetect();
+    setStatus("Pixel fix: detecting…");
+    // Yield so the status paint lands before the sync detect blocks.
+    setTimeout(() => {
+      const t0 = performance.now();
+      const candidates = detectPixelFix(source, params);
+      setPixelFixCandidates(candidates);
+      if (!candidates.length) {
+        setPixelFixSprite(null);
+        setPixelFixPreview(null);
+        setStatus("Pixel fix: no grid candidates");
         return;
       }
+      const idx = Math.min(pixelFixerControls.candidateIndex, candidates.length - 1);
+      const best = candidates[idx];
+      setPixelFixerControls((prev) => ({
+        ...prev,
+        candidateIndex: idx,
+        pitch: best.pitch,
+        offsetX: best.offsetX,
+        offsetY: best.offsetY,
+      }));
+      const { sprite, preview } = reconstructPixelFix(source, {
+        pitch: best.pitch,
+        offsetX: best.offsetX,
+        offsetY: best.offsetY,
+        alphaThreshold: pixelFixerControls.alphaThreshold,
+      });
+      setPixelFixSprite(sprite);
+      setPixelFixPreview(preview);
+      setStatus(
+        `Pixel fix: ${best.cols}×${best.rows} @ pitch ${best.pitch} (${Math.round(performance.now() - t0)} ms)`,
+      );
+    }, 0);
+  }, [source, pixelFixerControls.minPitch, pixelFixerControls.maxPitch, pixelFixerControls.candidateCount, pixelFixerControls.alphaThreshold, pixelFixerControls.candidateIndex]);
+
+  // Reconstruct when lattice knobs change — only while Pixel Fix is visible.
+  useEffect(() => {
+    if (!source || !pixelFixActive) return;
+    if (!pixelFixerControls.pitch) return;
+    clearTimeout(pixelFixTimer.current);
+    pixelFixTimer.current = setTimeout(() => {
       const { sprite, preview } = reconstructPixelFix(source, {
         pitch: pixelFixerControls.pitch,
         offsetX: pixelFixerControls.offsetX,
@@ -359,18 +366,34 @@ export function App() {
       if (sprite) {
         setStatus(`Pixel fix: ${sprite.width}×${sprite.height} @ pitch ${pixelFixerControls.pitch}`);
       }
-    }, 100);
+    }, 80);
     return () => clearTimeout(pixelFixTimer.current);
   }, [
     source,
+    pixelFixActive,
     pixelFixerControls.pitch,
     pixelFixerControls.offsetX,
     pixelFixerControls.offsetY,
     pixelFixerControls.alphaThreshold,
-    pixelFixerControls.minPitch,
-    pixelFixerControls.maxPitch,
-    runPixelFixDetect,
   ]);
+
+  // First visit to Pixel Fix with no lattice yet → run detect once.
+  const pixelFixAutoRan = useRef(false);
+  useEffect(() => {
+    if (!pixelFixActive || !source) return;
+    if (pixelFixerControls.pitch || pixelFixCandidates.length) {
+      pixelFixAutoRan.current = true;
+      return;
+    }
+    if (pixelFixAutoRan.current) return;
+    pixelFixAutoRan.current = true;
+    runPixelFixDetect();
+  }, [pixelFixActive, source, pixelFixerControls.pitch, pixelFixCandidates.length, runPixelFixDetect]);
+
+  // Reset the one-shot flag when the source image changes.
+  useEffect(() => {
+    pixelFixAutoRan.current = false;
+  }, [source]);
 
   // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
   // only update a shader uniform, so no ImageData is rebuilt per drag here.

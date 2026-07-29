@@ -525,7 +525,8 @@ export function ControlsPanel({
         <ControlCard title="Candidates">
           <p class="hint">
             Strict-grid MVP: detect a global pixel lattice, vote a median colour
-            per cell, export the real low-res sprite.
+            per cell, export the real low-res sprite. Detection only runs here
+            (not in the background while you use other tabs).
           </p>
           <button
             type="button"

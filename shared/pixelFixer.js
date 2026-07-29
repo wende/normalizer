@@ -72,20 +72,23 @@ export function reconstructPixelGrid(source, opts) {
   }
 
   const data = new Uint8ClampedArray(cols * rows * 4);
-  const cellArea = pitch * pitch;
-  const rs = new Uint8Array(cellArea);
-  const gs = new Uint8Array(cellArea);
-  const bs = new Uint8Array(cellArea);
-  const as = new Uint8Array(cellArea);
+  // Subsample large cells for the median vote — full 64² sorts are wasteful.
+  const sampleStep = pitch > 8 ? Math.max(1, Math.floor(pitch / 8)) : 1;
+  const maxSamples = Math.ceil(pitch / sampleStep) ** 2;
+  const rs = new Uint8Array(maxSamples);
+  const gs = new Uint8Array(maxSamples);
+  const bs = new Uint8Array(maxSamples);
+  const as = new Uint8Array(maxSamples);
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
       let n = 0;
       let opaque = 0;
+      let seen = 0;
       const x0 = offsetX + col * pitch;
       const y0 = offsetY + row * pitch;
-      for (let dy = 0; dy < pitch; dy += 1) {
-        for (let dx = 0; dx < pitch; dx += 1) {
+      for (let dy = 0; dy < pitch; dy += sampleStep) {
+        for (let dx = 0; dx < pitch; dx += sampleStep) {
           const si = rgbaOffset(source.width, x0 + dx, y0 + dy);
           const a = source.data[si + 3];
           rs[n] = source.data[si];
@@ -93,12 +96,13 @@ export function reconstructPixelGrid(source, opts) {
           bs[n] = source.data[si + 2];
           as[n] = a;
           n += 1;
+          seen += 1;
           if (a >= alphaThreshold) opaque += 1;
         }
       }
 
       const di = rgbaOffset(cols, col, row);
-      if (opaque * 2 < cellArea) {
+      if (opaque * 2 < seen) {
         data[di] = 0;
         data[di + 1] = 0;
         data[di + 2] = 0;
@@ -106,7 +110,6 @@ export function reconstructPixelGrid(source, opts) {
         continue;
       }
 
-      // Vote only on opaque samples for RGB; alpha uses the full cell median.
       const rgbCount = packOpaque(rs, gs, bs, as, n, alphaThreshold);
       data[di] = medianUint8(rs, rgbCount);
       data[di + 1] = medianUint8(gs, rgbCount);
@@ -122,6 +125,9 @@ export function reconstructPixelGrid(source, opts) {
  * Detect likely global square lattices and reconstruct the top candidates.
  * Returns { candidates: [{ pitch, offsetX, offsetY, cols, rows, score, sprite }] }
  * sorted by ascending score (lower is better).
+ *
+ * Ranking uses a cheap subsampled variance search; only the final top-N get a
+ * full median reconstruct. Designed to stay interactive on ~1k² sources.
  */
 export function detectPixelGrid(source, params = {}) {
   const p = { ...DEFAULT_PIXEL_FIXER_PARAMS, ...params };
@@ -136,41 +142,38 @@ export function detectPixelGrid(source, params = {}) {
   // Manual pitch: search offsets (or use fixed ones) and return one candidate.
   if (p.pitch > 0) {
     const pitch = Math.max(minPitch, Math.min(maxPitch, Math.round(p.pitch)));
-    const fixed = scorePitch(source, pitch, alphaThreshold, p.offsetX, p.offsetY);
-    return { candidates: fixed ? [fixed] : [] };
+    const ranked = rankPitch(source, pitch, alphaThreshold, p.offsetX, p.offsetY);
+    if (!ranked) return { candidates: [] };
+    return { candidates: [finalizeCandidate(source, ranked, alphaThreshold)] };
   }
 
-  const pitches = findPitchCandidates(source, minPitch, maxPitch, Math.max(8, candidateCount * 3));
-  const scored = [];
-  const seen = new Set();
+  const pitches = findPitchCandidates(source, minPitch, maxPitch, Math.max(6, candidateCount * 2));
+  const ranked = [];
+  const seenPitch = new Set();
 
   for (const pitch of pitches) {
-    const best = scorePitch(source, pitch, alphaThreshold, -1, -1);
-    if (!best) continue;
-    const key = `${best.pitch}:${best.offsetX}:${best.offsetY}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    scored.push(best);
+    if (seenPitch.has(pitch)) continue;
+    seenPitch.add(pitch);
+    const best = rankPitch(source, pitch, alphaThreshold, -1, -1);
+    if (best) ranked.push(best);
   }
 
-  // Also try neighbour pitches around the best autocorrelation peaks in case
-  // the true pitch sits between local maxima.
-  for (const pitch of pitches.slice(0, 4)) {
+  // Neighbours of the strongest autocorrelation peaks only.
+  for (const pitch of pitches.slice(0, 3)) {
     for (const delta of [-1, 1]) {
       const alt = pitch + delta;
-      if (alt < minPitch || alt > maxPitch) continue;
-      const best = scorePitch(source, alt, alphaThreshold, -1, -1);
-      if (!best) continue;
-      const key = `${best.pitch}:${best.offsetX}:${best.offsetY}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      scored.push(best);
+      if (alt < minPitch || alt > maxPitch || seenPitch.has(alt)) continue;
+      seenPitch.add(alt);
+      const best = rankPitch(source, alt, alphaThreshold, -1, -1);
+      if (best) ranked.push(best);
     }
   }
 
-  scored.sort((a, b) => a.score - b.score);
-  const filtered = suppressHarmonics(scored);
-  return { candidates: filtered.slice(0, candidateCount) };
+  ranked.sort((a, b) => a.score - b.score);
+  const filtered = suppressHarmonics(ranked).slice(0, candidateCount);
+  return {
+    candidates: filtered.map((r) => finalizeCandidate(source, r, alphaThreshold)),
+  };
 }
 
 /**
@@ -206,7 +209,6 @@ function packOpaque(rs, gs, bs, as, n, alphaThreshold) {
 
 function medianUint8(values, count) {
   if (count <= 0) return 0;
-  // Partial selection via copy + sort is fine at cell scale (≤ 64²).
   const slice = Array.from(values.subarray(0, count));
   slice.sort((a, b) => a - b);
   const mid = count >> 1;
@@ -224,19 +226,16 @@ function findPitchCandidates(source, minPitch, maxPitch, limit) {
     for (let x = 0; x < width; x += 1) {
       const i = y * width + x;
       if (x + 1 < width) {
-        const dx = Math.abs(gray[i + 1] - gray[i]);
-        colEnergy[x] += dx;
+        colEnergy[x] += Math.abs(gray[i + 1] - gray[i]);
       }
       if (y + 1 < height) {
-        const dy = Math.abs(gray[i + width] - gray[i]);
-        rowEnergy[y] += dy;
+        rowEnergy[y] += Math.abs(gray[i + width] - gray[i]);
       }
     }
   }
 
   const colAc = autocorrelation(colEnergy, minPitch, maxPitch);
   const rowAc = autocorrelation(rowEnergy, minPitch, maxPitch);
-  // Combine axes so square pitches that appear on both rise to the top.
   const combined = new Float64Array(maxPitch + 1);
   for (let lag = minPitch; lag <= maxPitch; lag += 1) {
     combined[lag] = colAc[lag] * rowAc[lag];
@@ -254,7 +253,6 @@ function findPitchCandidates(source, minPitch, maxPitch, limit) {
     if (out.length >= limit) break;
   }
 
-  // Guarantee a dense fallback scan of common pitches if edges are weak.
   if (out.length < 3) {
     for (let lag = minPitch; lag <= Math.min(maxPitch, 32); lag += 1) {
       if (used.has(lag)) continue;
@@ -299,22 +297,15 @@ function localMaxima(scores, minLag, maxLag) {
       peaks.push({ lag, score: v });
     }
   }
-  // If no clear peaks, fall back to global ranking of all lags.
   if (!peaks.length) {
-    for (let lag = minPitchSafe(minLag); lag <= maxLag; lag += 1) {
+    for (let lag = minLag; lag <= maxLag; lag += 1) {
       peaks.push({ lag, score: scores[lag] });
     }
   }
   return peaks;
 }
 
-function minPitchSafe(minLag) {
-  return minLag;
-}
-
 function suppressHarmonics(scored) {
-  // Drop smaller pitches that evenly divide a better (already-kept) pitch when
-  // both have near-zero variance — they are the same lattice subdivided.
   const kept = [];
   for (const cand of scored) {
     const dominated = kept.some((better) => {
@@ -328,10 +319,9 @@ function suppressHarmonics(scored) {
 }
 
 /**
- * Find best offsets for a pitch (or use fixed ones) and return a scored
- * candidate with a median-reconstructed sprite.
+ * Cheap rank: find best offsets via subsampled variance only. No median yet.
  */
-function scorePitch(source, pitch, alphaThreshold, fixedOx, fixedOy) {
+function rankPitch(source, pitch, alphaThreshold, fixedOx, fixedOy) {
   const cols = Math.floor(source.width / pitch);
   const rows = Math.floor(source.height / pitch);
   if (cols < 2 || rows < 2) return null;
@@ -341,12 +331,12 @@ function scorePitch(source, pitch, alphaThreshold, fixedOx, fixedOy) {
   let bestVar = Infinity;
 
   if (fixedOx >= 0 && fixedOy >= 0) {
-    bestOx = fixedOx % pitch;
-    bestOy = fixedOy % pitch;
+    bestOx = ((fixedOx % pitch) + pitch) % pitch;
+    bestOy = ((fixedOy % pitch) + pitch) % pitch;
     bestVar = gridVariance(source, pitch, bestOx, bestOy, alphaThreshold);
   } else {
-    // Coarse then refine: step-2 sweep, then ±1 neighbourhood around the winner.
-    const coarseStep = pitch > 8 ? 2 : 1;
+    // Aggressive coarse sweep — pitch/4 steps, then nested refine down to 1px.
+    const coarseStep = Math.max(1, Math.floor(pitch / 4));
     for (let oy = 0; oy < pitch; oy += coarseStep) {
       for (let ox = 0; ox < pitch; ox += coarseStep) {
         const v = gridVariance(source, pitch, ox, oy, alphaThreshold);
@@ -357,11 +347,13 @@ function scorePitch(source, pitch, alphaThreshold, fixedOx, fixedOy) {
         }
       }
     }
-    if (coarseStep > 1) {
-      for (let dy = -1; dy <= 1; dy += 1) {
-        for (let dx = -1; dx <= 1; dx += 1) {
-          const ox = (((bestOx + dx) % pitch) + pitch) % pitch;
-          const oy = (((bestOy + dy) % pitch) + pitch) % pitch;
+    for (let step = Math.max(1, Math.floor(coarseStep / 2)); ; step = Math.floor(step / 2) || 1) {
+      const centerOx = bestOx;
+      const centerOy = bestOy;
+      for (let dy = -step * 2; dy <= step * 2; dy += step) {
+        for (let dx = -step * 2; dx <= step * 2; dx += step) {
+          const ox = (((centerOx + dx) % pitch) + pitch) % pitch;
+          const oy = (((centerOy + dy) % pitch) + pitch) % pitch;
           const v = gridVariance(source, pitch, ox, oy, alphaThreshold);
           if (v < bestVar) {
             bestVar = v;
@@ -370,47 +362,60 @@ function scorePitch(source, pitch, alphaThreshold, fixedOx, fixedOy) {
           }
         }
       }
+      if (step === 1) break;
     }
   }
 
-  const sprite = reconstructPixelGrid(source, {
-    pitch,
-    offsetX: bestOx,
-    offsetY: bestOy,
-    alphaThreshold,
-  });
-  if (sprite.cols < 1 || sprite.rows < 1) return null;
+  const logicalCols = Math.floor((source.width - bestOx) / pitch);
+  const logicalRows = Math.floor((source.height - bestOy) / pitch);
+  if (logicalCols < 1 || logicalRows < 1) return null;
 
-  const reconError = reconstructionError(source, sprite, pitch, bestOx, bestOy, alphaThreshold);
-  const sizePrior = sizePenalty(sprite.cols, sprite.rows, source.width, source.height, pitch);
-  // Prefer larger pitches when variance is similar — pitch/2 harmonics of a
-  // true lattice also have near-zero within-cell variance.
+  const sizePrior = sizePenalty(logicalCols, logicalRows, source.width, source.height, pitch);
   const pitchBias = pitch * pitch;
-  const score = (bestVar + reconError * 0.5) / pitchBias + sizePrior;
+  const score = bestVar / pitchBias + sizePrior;
 
   return {
     pitch,
     offsetX: bestOx,
     offsetY: bestOy,
-    cols: sprite.cols,
-    rows: sprite.rows,
+    cols: logicalCols,
+    rows: logicalRows,
     score,
     variance: bestVar,
-    reconError,
+  };
+}
+
+function finalizeCandidate(source, ranked, alphaThreshold) {
+  const sprite = reconstructPixelGrid(source, {
+    pitch: ranked.pitch,
+    offsetX: ranked.offsetX,
+    offsetY: ranked.offsetY,
+    alphaThreshold,
+  });
+  return {
+    ...ranked,
+    cols: sprite.cols,
+    rows: sprite.rows,
     sprite,
   };
 }
 
+/**
+ * Subsampled within-cell RGB variance. Samples a sparse grid of cells but
+ * every pixel inside each sampled cell (needed to discriminate 1px offsets).
+ */
 function gridVariance(source, pitch, offsetX, offsetY, alphaThreshold) {
   const cols = Math.floor((source.width - offsetX) / pitch);
   const rows = Math.floor((source.height - offsetY) / pitch);
   if (cols < 1 || rows < 1) return Infinity;
 
+  const cellStride = Math.max(1, Math.floor(Math.min(cols, rows) / 12));
+
   let totalVar = 0;
   let cells = 0;
 
-  for (let row = 0; row < rows; row += 1) {
-    for (let col = 0; col < cols; col += 1) {
+  for (let row = 0; row < rows; row += cellStride) {
+    for (let col = 0; col < cols; col += cellStride) {
       const x0 = offsetX + col * pitch;
       const y0 = offsetY + row * pitch;
       let n = 0;
@@ -424,10 +429,12 @@ function gridVariance(source, pitch, offsetX, offsetY, alphaThreshold) {
       for (let dy = 0; dy < pitch; dy += 1) {
         for (let dx = 0; dx < pitch; dx += 1) {
           const si = rgbaOffset(source.width, x0 + dx, y0 + dy);
-          if (source.data[si + 3] < alphaThreshold) continue;
-          const r = source.data[si];
-          const g = source.data[si + 1];
-          const b = source.data[si + 2];
+          // Count transparent samples as black so mixed alpha/empty borders
+          // raise variance and prefer offsets that hug the opaque content.
+          const opaque = source.data[si + 3] >= alphaThreshold;
+          const r = opaque ? source.data[si] : 0;
+          const g = opaque ? source.data[si + 1] : 0;
+          const b = opaque ? source.data[si + 2] : 0;
           sumR += r;
           sumG += g;
           sumB += b;
@@ -450,37 +457,7 @@ function gridVariance(source, pitch, offsetX, offsetY, alphaThreshold) {
   return cells ? totalVar / cells : Infinity;
 }
 
-function reconstructionError(source, sprite, pitch, offsetX, offsetY, alphaThreshold) {
-  let err = 0;
-  let count = 0;
-  for (let row = 0; row < sprite.rows; row += 1) {
-    for (let col = 0; col < sprite.cols; col += 1) {
-      const ci = rgbaOffset(sprite.cols, col, row);
-      const cr = sprite.data[ci];
-      const cg = sprite.data[ci + 1];
-      const cb = sprite.data[ci + 2];
-      const ca = sprite.data[ci + 3];
-      const x0 = offsetX + col * pitch;
-      const y0 = offsetY + row * pitch;
-      for (let dy = 0; dy < pitch; dy += 1) {
-        for (let dx = 0; dx < pitch; dx += 1) {
-          const si = rgbaOffset(source.width, x0 + dx, y0 + dy);
-          const sa = source.data[si + 3];
-          if (sa < alphaThreshold && ca < alphaThreshold) continue;
-          err += Math.abs(source.data[si] - cr)
-            + Math.abs(source.data[si + 1] - cg)
-            + Math.abs(source.data[si + 2] - cb)
-            + Math.abs(sa - ca);
-          count += 1;
-        }
-      }
-    }
-  }
-  return count ? err / count : Infinity;
-}
-
 function sizePenalty(cols, rows, srcW, srcH, pitch) {
-  // Soft priors only — extreme sizes, not ordinary small sprites like 4×3.
   const logical = cols * rows;
   const sourcePixels = Math.max(1, srcW * srcH);
   const coverage = (cols * pitch * rows * pitch) / sourcePixels;
@@ -488,7 +465,6 @@ function sizePenalty(cols, rows, srcW, srcH, pitch) {
   if (logical < 4) penalty += 50;
   if (cols < 2 || rows < 2) penalty += 50;
   if (coverage < 0.4) penalty += (0.4 - coverage) * 20;
-  // Near 1:1 with the source means the "grid" is just individual pixels.
   if (pitch <= 2 && logical > sourcePixels * 0.5) penalty += 30;
   return penalty;
 }
