@@ -59,9 +59,13 @@ inventory in REWRITE_PLAN.md §2.
    AO), `cli/normalizer.js occlusion` subcommand, web Occlusion panel +
    preview tab, `tests/occlusion.test.js`. `shared/primitives.js` gained
    `distanceTransform` (extracted from `alphaDistance`).
-5. ❌ **Export with suffix convention** — NOT STARTED. CLI takes a single
-   explicit output path; no `_n/_p/_s/_o` logic anywhere. Web export uses
-   `normalizer-<map>.png` filenames instead (`App.jsx`).
+5. ✅ ~~**Export with suffix convention**~~ — DONE (web Export Pack).
+   Toolbar **Export Pack** downloads a ZIP:
+   `{name}/{name}_albedo.png`, `_normal.png`, `_height.png` (parallax
+   renamed), `_ao.png`, `_specular.png`, plus `normalizer.json`
+   (`format: "normalizer-material"`). Single **Export PNG** uses the same
+   suffixes. No Godot `.tres` / Unity `.mat` yet — the manifest is the
+   hand-off for engine importers. CLI batch suffixes still NOT STARTED.
 6. ❌ **Tileable 3×3 neighbour mosaics** — NOT STARTED. No tileX/tileY,
    mosaic, or center-crop code. (Original intent: compute on mosaic, crop
    center, per REWRITE_PLAN.md §1 "Tileability"; plain self-tiling first,
@@ -100,7 +104,7 @@ inventory in REWRITE_PLAN.md §2.
 | Custom heightmap / specular base inputs (UI) | §2 "Inputs" | User demand. Generation code keeps accepting an optional height/specular source so only UI is missing. | 🟡 Partial — `generateSpecularMap(source, p, specularBase = source)` and `generateParallaxMap(source, p, height = source, bevelDistance = null)` accept optional sources; no UI loaders exist. `generateNormalMap` still takes no height/spec source. |
 | Tauri desktop packaging | §3 Phase 3.1 | Only if folder-watch or distribution to non-terminal users becomes a goal; Node CLI covers batch until then. | ❌ Still deferred. |
 | Performance budget validation | §3 Phase 4.3 | Don't formalize; log recompute time in dev, look at it as each map lands. | ❌ Still deferred (no recompute-time logging in `web/`). |
-| New project zip format | §3 Phase 3.6 | Project firms up into a product. Until then: JSON settings export alongside PNGs. | ❌ Still deferred. |
+| New project zip format | §3 Phase 3.6 | Project firms up into a product. Until then: JSON settings export alongside PNGs. | 🟡 Partial — engine-facing **Export Pack** (`normalizer.json` + maps ZIP) shipped in the web UI; full project snapshot (controls + AI overlay) still deferred. |
 
 ## 4. Drop (invalidated by the decisions above)
 
