@@ -9,10 +9,13 @@
 
 import { grayscaleFromRgba } from "./image.js";
 import { gaussianBlur } from "./primitives.js";
+import { downsampleRgba, normalizePixelSize, toArtUnits, upsampleNearest } from "./pixelScale.js";
 
 /**
  * Default specular-map parameters. Mirrors the CLI defaults so both share one
  * source of truth (the web UI keeps its own prettier blur default in controls.js).
+ *
+ * `pixelSize` > 1: blur runs at logical (art) resolution — see shared/pixelScale.js.
  */
 export const DEFAULT_SPECULAR_PARAMS = {
   specularThresh: 127,
@@ -21,6 +24,7 @@ export const DEFAULT_SPECULAR_PARAMS = {
   specularBlur: 3,
   specularInvert: false,
   useAlpha: false,
+  pixelSize: 1,
 };
 
 /**
@@ -32,6 +36,22 @@ export const DEFAULT_SPECULAR_PARAMS = {
  * always comes from `source`.
  */
 export function generateSpecularMap(source, p, specularBase = source) {
+  const scale = normalizePixelSize(p?.pixelSize);
+  if (scale > 1) {
+    const lowSrc = downsampleRgba(source, scale);
+    const lowBase = specularBase === source ? lowSrc : downsampleRgba(specularBase, scale);
+    const out = generateSpecularMap(
+      lowSrc,
+      {
+        ...p,
+        pixelSize: 1,
+        specularBlur: toArtUnits(p.specularBlur, scale),
+      },
+      lowBase,
+    );
+    return upsampleNearest(out, source.width, source.height, scale);
+  }
+
   const width = source.width;
   const height = source.height;
   // Intentional divergence from upstream: Laigter converts SpecularBase via

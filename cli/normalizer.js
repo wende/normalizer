@@ -36,6 +36,7 @@ const USAGE = [
   "  --invert-y                       flip the Y channel",
   "  --invert-z                       flip the Z channel",
   "  --use-normal-alpha               copy the source alpha into the output",
+  "  --pixel-size <int>               art-pixel block size; >1 = process at logical resolution (default 1)",
   "",
   "specular options:",
   "  --specular-thresh <int>          contrast pivot (default 127)",
@@ -44,6 +45,7 @@ const USAGE = [
   "  --specular-blur <int>            blur sigma (default 3)",
   "  --specular-invert                invert the map",
   "  --use-specular-alpha             copy the source alpha into the output",
+  "  --pixel-size <int>               art-pixel block size (default 1)",
   "",
   "parallax options:",
   "  --parallax-type <binary|heightmap>  type (default binary)",
@@ -56,6 +58,7 @@ const USAGE = [
   "  --parallax-contrast <float>      heightmap contrast (default 1.0)",
   "  --parallax-invert                invert the map",
   "  --use-parallax-alpha             copy the source alpha into the output",
+  "  --pixel-size <int>               art-pixel block size (default 1)",
   "",
   "occlusion options:",
   "  --occlusion-thresh <int>         threshold + contrast pivot (default 1)",
@@ -66,6 +69,7 @@ const USAGE = [
   "  --occlusion-distance <int>       distance falloff scale (default 10)",
   "  --occlusion-invert               invert the map",
   "  --use-occlusion-alpha            copy the source alpha into the output",
+  "  --pixel-size <int>               art-pixel block size (default 1)",
 ].join("\n");
 
 function failUsage(message) {
@@ -138,6 +142,9 @@ function parseNormalFlags(args) {
       case "--use-normal-alpha":
         params.useAlpha = true;
         break;
+      case "--pixel-size":
+        params.pixelSize = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
       default:
         fail(`unknown option: ${arg}`);
     }
@@ -167,6 +174,9 @@ function parseSpecularFlags(args) {
         break;
       case "--use-specular-alpha":
         params.useAlpha = true;
+        break;
+      case "--pixel-size":
+        params.pixelSize = parseInt32(requireValue(args, (i += 1), arg), arg);
         break;
       default:
         fail(`unknown option: ${arg}`);
@@ -215,6 +225,9 @@ function parseParallaxFlags(args) {
       case "--use-parallax-alpha":
         params.useAlpha = true;
         break;
+      case "--pixel-size":
+        params.pixelSize = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
       default:
         fail(`unknown option: ${arg}`);
     }
@@ -250,6 +263,9 @@ function parseOcclusionFlags(args) {
         break;
       case "--use-occlusion-alpha":
         params.useAlpha = true;
+        break;
+      case "--pixel-size":
+        params.pixelSize = parseInt32(requireValue(args, (i += 1), arg), arg);
         break;
       default:
         fail(`unknown option: ${arg}`);

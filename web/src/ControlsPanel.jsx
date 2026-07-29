@@ -109,6 +109,19 @@ export function ControlsPanel({
               Toon
             </ToggleRow>
           </div>
+          <RangeRow
+            label="Pixel size"
+            id="pixelSize"
+            min={1}
+            max={32}
+            value={lightControls.pixelSize}
+            onChange={(v) => onLightControlsChange({
+              pixelSize: v,
+              ...(v > 1 ? { pixelated: true } : {}),
+            })}
+            format={(v) => (v <= 1 ? "1 (off)" : `${v}×`)}
+          />
+          <p class="hint">Auto-detected on load. Soft/Blur stay in screen pixels; larger size = chunkier facets, not more blur.</p>
         </ControlCard>
 
         <ControlCard title="Diffuse">

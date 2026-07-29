@@ -34,6 +34,7 @@ import {
   imageDataToPngBytes,
   singleMapFilename,
 } from "./exportPack.js";
+import { detectPixelSize, pixelateNormalMap } from "shared/pixelScale.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
@@ -83,21 +84,32 @@ export function App() {
   const aiWorker = useRef(null);
 
   // The raw DeepBump output (aiOverlay) is kept pristine; live post-process
-  // tweaks (strength/smooth/steps) are applied on top to produce the AI normal.
-  // No re-inference — this recomputes instantly as the Adjust sliders move.
+  // tweaks (strength/smooth/steps/pixelSize) are applied on top to produce the
+  // AI normal. No re-inference — this recomputes instantly as sliders move.
   const aiNormal = useMemo(() => {
     if (!aiOverlay) return null;
     return adjustNormalMap(aiOverlay, {
       strength: aiControls.strength / 100,
       smooth: aiControls.smooth,
       steps: aiControls.steps,
+      pixelSize: lightControls.pixelSize,
     });
-  }, [aiOverlay, aiControls.strength, aiControls.smooth, aiControls.steps]);
+  }, [aiOverlay, aiControls.strength, aiControls.smooth, aiControls.steps, lightControls.pixelSize]);
+
+  // Procedural normals already honour pixelSize inside generateNormalMap; snap
+  // again so AI and procedural share the same block-facet look (idempotent when
+  // already block-constant). Also covers any worker path that omitted the flag.
+  const proceduralDisplay = useMemo(() => {
+    if (!proceduralNormal) return null;
+    if (!(lightControls.pixelSize > 1)) return proceduralNormal;
+    const snapped = pixelateNormalMap(proceduralNormal, lightControls.pixelSize);
+    return new ImageData(snapped.data, snapped.width, snapped.height);
+  }, [proceduralNormal, lightControls.pixelSize]);
 
   // The active normal depends entirely on the pipeline — the procedural and AI
   // maps are never mixed. Everything downstream (Lit/Split/Normal views, Export)
   // reads this one value.
-  const activeNormal = pipeline === "ai" ? aiNormal : proceduralNormal;
+  const activeNormal = pipeline === "ai" ? aiNormal : proceduralDisplay;
 
   // Load the light sprite once on mount so it's ready when drawPreview runs.
   useEffect(() => {
@@ -200,7 +212,7 @@ export function App() {
     if (!source) return;
     clearTimeout(generateTimer.current);
     generateTimer.current = setTimeout(() => {
-      const params = buildNormalParams(normalControls);
+      const params = buildNormalParams(normalControls, lightControls.pixelSize);
       requestNormal(
         { width: source.width, height: source.height, data: source.data },
         params,
@@ -214,39 +226,39 @@ export function App() {
       });
     }, 40);
     return () => clearTimeout(generateTimer.current);
-  }, [source, normalControls]);
+  }, [source, normalControls, lightControls.pixelSize]);
 
   // Specular map — recomputed (debounced) from the source + specular sliders.
   useEffect(() => {
     if (!source) return;
     clearTimeout(specularTimer.current);
     specularTimer.current = setTimeout(() => {
-      const params = buildSpecularParams(specularControls);
+      const params = buildSpecularParams(specularControls, lightControls.pixelSize);
       setSpecularMap(generateSpecular(source, params));
     }, 40);
     return () => clearTimeout(specularTimer.current);
-  }, [source, specularControls]);
+  }, [source, specularControls, lightControls.pixelSize]);
 
   // Parallax map — recomputed (debounced) from the source + parallax sliders.
   useEffect(() => {
     if (!source) return;
     clearTimeout(parallaxTimer.current);
     parallaxTimer.current = setTimeout(() => {
-      const params = buildParallaxParams(parallaxControls);
+      const params = buildParallaxParams(parallaxControls, lightControls.pixelSize);
       setParallaxMap(generateParallax(source, params));
     }, 40);
     return () => clearTimeout(parallaxTimer.current);
-  }, [source, parallaxControls]);
+  }, [source, parallaxControls, lightControls.pixelSize]);
   // Occlusion map — recomputed (debounced) from the source + occlusion sliders.
   useEffect(() => {
     if (!source) return;
     clearTimeout(occlusionTimer.current);
     occlusionTimer.current = setTimeout(() => {
-      const params = buildOcclusionParams(occlusionControls);
+      const params = buildOcclusionParams(occlusionControls, lightControls.pixelSize);
       setOcclusionMap(generateOcclusion(source, params));
     }, 40);
     return () => clearTimeout(occlusionTimer.current);
-  }, [source, occlusionControls]);
+  }, [source, occlusionControls, lightControls.pixelSize]);
 
   // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
   // only update a shader uniform, so no ImageData is rebuilt per drag here.
@@ -264,7 +276,7 @@ export function App() {
     splitRatio,
     lightSettings: buildLightSettings(light, lightControls),
     toon: lightControls.toon,
-    pixelated: lightControls.pixelated,
+    pixelated: lightControls.pixelated || lightControls.pixelSize > 1,
     draggingLight: draggingLight.current,
     draggingSplit,
     lightSprite: lightSprite.current,
@@ -297,13 +309,28 @@ export function App() {
 
   const loadFromImage = useCallback(async (image, { aiNormalImage = null, baseName = SAMPLE_BASE_NAME } = {}) => {
     const data = readSourceFromImage(image);
+    // Auto-detect nearest-neighbour art scale from solid-color run GCDs so Soft
+    // / Blur respect fake resolution without a manual Pixel size tweak.
+    const detected = detectPixelSize(data, { tolerance: 2 });
     setSource(data);
     setSourceName(baseName);
+    setLightControls((prev) => {
+      const next = {
+        ...prev,
+        pixelSize: detected,
+        // Crisp preview filtering whenever art-scale maps are in play.
+        ...(detected > 1 ? { pixelated: true } : {}),
+      };
+      return prev.pixelSize === next.pixelSize && prev.pixelated === next.pixelated
+        ? prev
+        : next;
+    });
     // Sample ships a precomputed DeepBump map; uploads clear AI until regenerate.
     setAiOverlay(aiNormalImage ? readSourceFromImage(aiNormalImage) : null);
     if (aiNormalImage) setPipeline("ai");
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
     setViewTilt({ x: 0, y: 0 });
+    return { width: data.width, height: data.height, pixelSize: detected };
   }, []);
 
   const loadSample = useCallback(async () => {
@@ -313,8 +340,12 @@ export function App() {
         decodeImage(SAMPLE_SRC),
         decodeImage(SAMPLE_AI_NORMAL_SRC),
       ]);
-      await loadFromImage(image, { aiNormalImage, baseName: SAMPLE_BASE_NAME });
-      setStatus(`${image.naturalWidth}x${image.naturalHeight} - sample ready`);
+      const { width, height, pixelSize } = await loadFromImage(image, {
+        aiNormalImage,
+        baseName: SAMPLE_BASE_NAME,
+      });
+      const scaleNote = pixelSize > 1 ? `, pixel size ${pixelSize}×` : "";
+      setStatus(`${width}x${height} - sample ready${scaleNote}`);
     } catch (error) {
       setStatus(error.message || SAMPLE_LOAD_ERROR);
     }
@@ -328,7 +359,11 @@ export function App() {
       const image = new Image();
       image.src = url;
       await image.decode();
-      await loadFromImage(image, { baseName: file.name || SAMPLE_BASE_NAME });
+      const { width, height, pixelSize } = await loadFromImage(image, {
+        baseName: file.name || SAMPLE_BASE_NAME,
+      });
+      const scaleNote = pixelSize > 1 ? `, pixel size ${pixelSize}×` : "";
+      setStatus(`${width}x${height}${scaleNote}`);
     } finally {
       URL.revokeObjectURL(url);
     }

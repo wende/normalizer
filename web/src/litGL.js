@@ -2,8 +2,9 @@
  * Lit-preview WebGL2 renderer — derived from laigter/shaders/fshader.glsl
  * (view_mode==5, single light). Steep parallax mapping in lit/split modes
  * follows Laigter's ParallaxMapping layer loop (WebGL-only; CPU fallback in
- * previewRender.js has no parallax). The fragment shader mirrors the per-pixel
- * math of buildLitPreview in shared/preview.js for the non-parallax path.
+ * previewRender.js has no parallax). Occlusion multiplies ambient only, matching
+ * upstream. The fragment shader mirrors the per-pixel math of buildLitPreview in
+ * shared/preview.js for the non-parallax path.
  *
  * Split mode draws the flat diffuse on the left (UV-panned as a rigid plane
  * under the same view tilt / preview depth) and lit+parallax on the right,
@@ -43,11 +44,13 @@ uniform sampler2D uTex;     // diffuse/albedo (always the source image)
 uniform sampler2D uNormal;  // tangent-space normal map
 uniform sampler2D uParallax;
 uniform sampler2D uSpecularMap;
+uniform sampler2D uOcclusionMap;
 uniform vec2 uResolution;   // source pixel dims
 uniform vec3 uLightPos;     // (x, y, lightZ) — x/y in pixels rel. center, lightZ already *1000
 uniform vec3 uDiffuseColor;  uniform float uDiffuseIntensity;
 uniform vec3 uSpecularColor; uniform float uSpecularIntensity; uniform float uSpecularScatter;
 uniform int uHasSpecularMap;     // 0 = full reflectivity, 1 = sample uSpecularMap
+uniform int uHasOcclusionMap;    // 0 = ambient unoccluded, 1 = sample uOcclusionMap.r
 uniform int uHasParallax;
 uniform float uHeightScale;
 uniform vec2 uViewTilt;
@@ -106,7 +109,8 @@ void main() {
   if (uToon == 1) spec = smoothstep(0.005, 0.01, spec);
   vec3 specMap = (uHasSpecularMap == 1) ? texture(uSpecularMap, uv).rgb : vec3(1.0);
   vec3 specular = uSpecularIntensity * spec * uSpecularColor * specMap;
-  vec3 ambient = uAmbientColor * uAmbientIntensity;
+  float occlusion = (uHasOcclusionMap == 1) ? texture(uOcclusionMap, uv).r : 1.0;
+  vec3 ambient = uAmbientColor * uAmbientIntensity * occlusion;
   frag = vec4(tex.rgb * (diffuse + specular + ambient), tex.a);
 }`;
 
@@ -145,8 +149,9 @@ export function createLitGL(canvas) {
   for (const name of [
     "uCanvasSize", "uMode", "uTex", "uNormal", "uParallax", "uResolution", "uLightPos",
     "uDiffuseColor", "uDiffuseIntensity", "uSpecularColor", "uSpecularIntensity",
-    "uSpecularScatter", "uSpecularMap", "uHasSpecularMap", "uHasParallax", "uHeightScale",
-    "uViewTilt", "uAmbientColor", "uAmbientIntensity", "uToon", "uUvOffset",
+    "uSpecularScatter", "uSpecularMap", "uHasSpecularMap", "uOcclusionMap", "uHasOcclusionMap",
+    "uHasParallax", "uHeightScale", "uViewTilt", "uAmbientColor", "uAmbientIntensity", "uToon",
+    "uUvOffset",
   ]) {
     loc[name] = gl.getUniformLocation(prog, name);
   }
@@ -206,11 +211,12 @@ export function createLitGL(canvas) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  function drawLit(source, normal, settings, toon, pixelated, specular, parallax, viewTilt, heightScale) {
+  function drawLit(source, normal, settings, toon, pixelated, specular, parallax, viewTilt, heightScale, occlusion) {
     upload("source", source, pixelated);
     upload("normal", normal, pixelated);
     if (specular) upload("specular", specular, pixelated);
     if (parallax) upload("parallax", parallax, pixelated);
+    if (occlusion) upload("occlusion", occlusion, pixelated);
     bindUnit(0, tex.source);
     gl.uniform1i(loc.uTex, 0);
     bindUnit(1, tex.normal);
@@ -228,6 +234,13 @@ export function createLitGL(canvas) {
       gl.uniform1i(loc.uHasParallax, 1);
     } else {
       gl.uniform1i(loc.uHasParallax, 0);
+    }
+    if (occlusion) {
+      bindUnit(4, tex.occlusion);
+      gl.uniform1i(loc.uOcclusionMap, 4);
+      gl.uniform1i(loc.uHasOcclusionMap, 1);
+    } else {
+      gl.uniform1i(loc.uHasOcclusionMap, 0);
     }
     gl.uniform1f(loc.uHeightScale, heightScale ?? 0);
     gl.uniform2f(loc.uViewTilt, viewTilt?.x ?? 0, viewTilt?.y ?? 0);
@@ -300,7 +313,7 @@ export function createLitGL(canvas) {
     } else if (mode === "normal") {
       drawPassthrough("normal", normal, pixelated);
     } else if (mode === "lit") {
-      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale, occlusion);
     } else {
       // Split: left = flat source panned as a rigid plane under the same tilt /
       // depth as parallax; right = lit + steep parallax. Clear the right scissor
@@ -312,7 +325,7 @@ export function createLitGL(canvas) {
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(rect.x + splitPx, ch - rect.y - rect.height, rect.width - splitPx, rect.height);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale);
+      drawLit(source, normal, lightSettings, toon, pixelated, specular, parallax, viewTilt, heightScale, occlusion);
       gl.disable(gl.SCISSOR_TEST);
     }
 
@@ -331,24 +344,28 @@ export function createLitGL(canvas) {
       const sd = new Uint8ClampedArray(W * H * 4);
       const nd = new Uint8ClampedArray(W * H * 4);
       const spd = new Uint8ClampedArray(W * H * 4);
+      const od = new Uint8ClampedArray(W * H * 4);
       for (let i = 0; i < W * H; i += 1) {
         const o = i * 4;
         sd[o] = (i * 53) % 256; sd[o + 1] = (i * 97) % 256; sd[o + 2] = (i * 151) % 256; sd[o + 3] = 255;
         nd[o] = 128; nd[o + 1] = 200; nd[o + 2] = 160; nd[o + 3] = 255;
         const v = (i * 37) % 256;
         spd[o] = v; spd[o + 1] = v; spd[o + 2] = v; spd[o + 3] = 255;
+        const ao = (i * 19) % 256;
+        od[o] = ao; od[o + 1] = ao; od[o + 2] = ao; od[o + 3] = 255;
       }
       const fixture = { width: W, height: H };
       const source = { ...fixture, data: sd };
       const normal = { ...fixture, data: nd };
       const specular = { ...fixture, data: spd };
+      const occlusion = { ...fixture, data: od };
       const settings = {
         x: 3.2, y: -1.5, z: 0.66,
         diffuseColor: [0.2, 0.9, 0.6], diffuseIntensity: 0.7,
         specularColor: [0.3, 0.8, 0.5], specularIntensity: 0.5, specularScatter: 24,
         ambientColor: [0.9, 0.9, 0.95], ambientIntensity: 0.6,
       };
-      const cpu = buildLitPreview(source, normal, settings, false, specular);
+      const cpu = buildLitPreview(source, normal, settings, false, specular, occlusion);
 
       const off = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, off);
@@ -362,7 +379,7 @@ export function createLitGL(canvas) {
       gl.uniform2f(loc.uCanvasSize, W, H);
       gl.bindVertexArray(vao);
       setQuad({ x: 0, y: 0, width: W, height: H });
-      drawLit(source, normal, settings, false, false, specular, null, { x: 0, y: 0 }, 0);
+      drawLit(source, normal, settings, false, false, specular, null, { x: 0, y: 0 }, 0, occlusion);
 
       const gpu = new Uint8Array(W * H * 4);
       gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, gpu);
