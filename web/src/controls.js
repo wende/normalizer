@@ -23,6 +23,10 @@ export const DEFAULT_NORMAL = {
 
 export const DEFAULT_LIGHT_CONTROLS = {
   pixelated: false,
+  // Art-pixel block size for map generation (1 = screen pixels). When the
+  // source is nearest-upscaled pixel art, set this to the upscale factor so
+  // Soft/Blur/Distance run at logical resolution.
+  pixelSize: 1,
   toon: false,
   diffuseIntensity: 60,
   specularIntensity: 60,
@@ -45,7 +49,7 @@ export const DEFAULT_AI_CONTROLS = {
   steps: 0, // normal-direction quantization for pixel-art facets; 0 = off
 };
 
-export function buildNormalParams(controls) {
+export function buildNormalParams(controls, pixelSize = 1) {
   return {
     normalDepth: Number(controls.normalDepth),
     normalBlurRadius: Number(controls.normalBlur),
@@ -57,6 +61,7 @@ export function buildNormalParams(controls) {
     invertY: false,
     invertZ: false,
     useAlpha: controls.useAlpha,
+    pixelSize: Number(pixelSize) || 1,
   };
 }
 
@@ -72,7 +77,7 @@ export const DEFAULT_SPECULAR = {
   useAlpha: false,
 };
 
-export function buildSpecularParams(controls) {
+export function buildSpecularParams(controls, pixelSize = 1) {
   return {
     specularThresh: Number(controls.specularThresh),
     specularContrast: Number(controls.specularContrast) / 1000,
@@ -80,6 +85,7 @@ export function buildSpecularParams(controls) {
     specularBlur: Number(controls.specularBlur),
     specularInvert: controls.specularInvert,
     useAlpha: controls.useAlpha,
+    pixelSize: Number(pixelSize) || 1,
   };
 }
 
@@ -104,7 +110,7 @@ export const DEFAULT_PARALLAX = {
   previewParallaxDepth: 30,
 };
 
-export function buildParallaxParams(controls) {
+export function buildParallaxParams(controls, pixelSize = 1) {
   return {
     ...DEFAULT_PARALLAX_PARAMS,
     parallaxType: controls.parallaxType,
@@ -117,6 +123,7 @@ export function buildParallaxParams(controls) {
     parallaxContrast: Number(controls.parallaxContrast) / 1000,
     parallaxInvert: controls.parallaxInvert,
     useAlpha: controls.useAlpha,
+    pixelSize: Number(pixelSize) || 1,
   };
 }
 
@@ -134,7 +141,7 @@ export const DEFAULT_OCCLUSION = {
   useAlpha: false,
 };
 
-export function buildOcclusionParams(controls) {
+export function buildOcclusionParams(controls, pixelSize = 1) {
   return {
     occlusionThresh: Number(controls.occlusionThresh),
     occlusionContrast: Number(controls.occlusionContrast) / 1000,
@@ -144,5 +151,6 @@ export function buildOcclusionParams(controls) {
     occlusionDistance: Number(controls.occlusionDistance),
     occlusionInvert: controls.occlusionInvert,
     useAlpha: controls.useAlpha,
+    pixelSize: Number(pixelSize) || 1,
   };
 }

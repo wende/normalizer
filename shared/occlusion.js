@@ -9,11 +9,15 @@
 
 import { grayscaleFromRgba } from "./image.js";
 import { distanceTransform, gaussianBlur } from "./primitives.js";
+import { downsampleRgba, normalizePixelSize, toArtUnits, upsampleNearest } from "./pixelScale.js";
 
 /**
  * Default occlusion-map parameters. Mirrors the CLI defaults so both share one
  * source of truth (the web UI keeps its own prettier blur/bright defaults in
  * controls.js). Distance mode defaults ON — the common path.
+ *
+ * `pixelSize` > 1: blur/distance run at logical (art) resolution — see
+ * shared/pixelScale.js.
  */
 export const DEFAULT_OCCLUSION_PARAMS = {
   occlusionThresh: 1,
@@ -24,6 +28,7 @@ export const DEFAULT_OCCLUSION_PARAMS = {
   occlusionDistance: 10,
   occlusionInvert: false,
   useAlpha: false,
+  pixelSize: 1,
 };
 
 // Circular "soft bevel" profile upstream uses for the distance-shaded occlusion
@@ -44,6 +49,23 @@ function circularProfile(v) {
  * `heightSource` defaults to `source`; alpha always comes from `source`.
  */
 export function generateOcclusionMap(source, p, heightSource = source) {
+  const scale = normalizePixelSize(p?.pixelSize);
+  if (scale > 1) {
+    const lowSrc = downsampleRgba(source, scale);
+    const lowHeight = heightSource === source ? lowSrc : downsampleRgba(heightSource, scale);
+    const out = generateOcclusionMap(
+      lowSrc,
+      {
+        ...p,
+        pixelSize: 1,
+        occlusionBlur: toArtUnits(p.occlusionBlur, scale),
+        occlusionDistance: toArtUnits(p.occlusionDistance, scale),
+      },
+      lowHeight,
+    );
+    return upsampleNearest(out, source.width, source.height, scale);
+  }
+
   const width = source.width;
   const height = source.height;
   const n = width * height;
