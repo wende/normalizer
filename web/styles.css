@@ -59,33 +59,37 @@ select {
   font: inherit;
 }
 
-/* Custom range sliders */
+/* Custom range sliders
+ * Hit area is taller than the visible track so thumbs stay easy to grab.
+ * touch-action: none keeps vertical panel scroll from stealing horizontal drags. */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
-  height: 16px;
+  height: 28px;
   width: 100%;
+  margin: 0;
+  touch-action: none;
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background: oklch(0.82 0.012 90);
 }
 
 input[type="range"]::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background: oklch(0.82 0.012 90);
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  margin-top: -6px;
+  margin-top: -7px;
   cursor: pointer;
   border: 2px solid white;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
@@ -93,13 +97,45 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid white;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   background: currentColor;
+  /* Firefox: keep thumb from shrinking the track hit area */
+  border-width: 2px;
+}
+
+/* Coarse pointers (phones/tablets): ~44px target + larger thumb */
+@media (pointer: coarse) {
+  input[type="range"] {
+    height: 44px;
+  }
+
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 4px;
+  }
+
+  input[type="range"]::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+    margin-top: -10px;
+    border-width: 3px;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-width: 3px;
+  }
 }
 
 /* Full-page app shell */
@@ -369,6 +405,9 @@ button:hover,
   margin: 0;
   color: var(--label);
   font-size: 14px;
+  /* Avoid selecting the label/value while dragging on touch devices. */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .range-row > span:first-child {
@@ -578,17 +617,35 @@ button:hover,
     padding: 14px;
   }
 
+  /* Stack label/value above a full-width track — cramped side-by-side rows
+     leave almost no horizontal travel on phones. */
   .range-row {
-    gap: 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    gap: 4px 10px;
+    align-items: center;
   }
 
   .range-row > span:first-child {
-    width: 56px;
+    width: auto;
     font-size: 13px;
+    grid-column: 1;
+    grid-row: 1;
   }
 
   .range-row output {
-    width: 40px;
+    width: auto;
+    min-width: 2.5ch;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .range-row input[type="range"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-height: 44px;
   }
 
   .color-row input[type="color"] {
