@@ -8,6 +8,7 @@ import {
   DEFAULT_SPECULAR,
   DEFAULT_PARALLAX,
   DEFAULT_OCCLUSION,
+  DEFAULT_PIXEL_FIXER,
 } from "./controls.js";
 
 const PIPELINES = [
@@ -22,6 +23,7 @@ const TABS = {
     { id: "specular", label: "Specular" },
     { id: "parallax", label: "Parallax" },
     { id: "occlusion", label: "Occlusion" },
+    { id: "pixelfix", label: "Pixel Fix" },
   ],
   ai: [
     { id: "light", label: "Light" },
@@ -29,6 +31,7 @@ const TABS = {
     { id: "specular", label: "Specular" },
     { id: "parallax", label: "Parallax" },
     { id: "occlusion", label: "Occlusion" },
+    { id: "pixelfix", label: "Pixel Fix" },
   ],
 };
 
@@ -51,6 +54,10 @@ export function ControlsPanel({
   onParallaxControlsChange,
   occlusionControls,
   onOcclusionControlsChange,
+  pixelFixerControls,
+  onPixelFixerControlsChange,
+  pixelFixerCandidates,
+  onPixelFixerDetect,
   lightControls,
   onLightControlsChange,
   aiControls,
@@ -66,7 +73,9 @@ export function ControlsPanel({
   const showSpecular = tab === "specular";
   const showParallax = tab === "parallax";
   const showOcclusion = tab === "occlusion";
+  const showPixelFix = tab === "pixelfix";
   const showAi = pipeline === "ai" && tab === "ai";
+  const selected = pixelFixerCandidates?.[pixelFixerControls.candidateIndex] || null;
 
   return (
     <aside class="controls" aria-label="Controls">
@@ -506,6 +515,99 @@ export function ControlsPanel({
       </div>
       )}
 
+      {showPixelFix && (
+      <div
+        class="control-panel active"
+        id="pixelfixPanel"
+        role="tabpanel"
+        data-control-tab="pixelfix"
+      >
+        <ControlCard title="Candidates">
+          <p class="hint">
+            Strict-grid MVP: detect a global pixel lattice, vote a median colour
+            per cell, export the real low-res sprite.
+          </p>
+          <button
+            type="button"
+            class="ai-generate"
+            onClick={onPixelFixerDetect}
+          >
+            Detect grid
+          </button>
+          <div class="radio-group" role="radiogroup" aria-label="Grid candidates">
+            {(pixelFixerCandidates || []).map((c, i) => (
+              <label key={`${c.pitch}-${c.offsetX}-${c.offsetY}-${i}`}>
+                <input
+                  type="radio"
+                  name="pixelFixCandidate"
+                  value={i}
+                  checked={pixelFixerControls.candidateIndex === i}
+                  onChange={() => onPixelFixerControlsChange({
+                    candidateIndex: i,
+                    pitch: c.pitch,
+                    offsetX: c.offsetX,
+                    offsetY: c.offsetY,
+                  })}
+                />
+                {" "}{c.cols}×{c.rows} @ pitch {c.pitch} (ox {c.offsetX}, oy {c.offsetY})
+              </label>
+            ))}
+          </div>
+          {selected ? (
+            <p class="hint">
+              Selected {selected.cols}×{selected.rows}, score {selected.score.toFixed(2)}.
+              Export writes the low-res PNG.
+            </p>
+          ) : (
+            <p class="hint">No candidates yet — load an image and Detect.</p>
+          )}
+        </ControlCard>
+
+        <ControlCard title="Lattice">
+          <RangeRow
+            label="Pitch"
+            id="pixelFixPitch"
+            min={2}
+            max={64}
+            value={pixelFixerControls.pitch || 8}
+            onChange={(v) => onPixelFixerControlsChange({ pitch: v })}
+          />
+          <RangeRow
+            label="Offset X"
+            id="pixelFixOffsetX"
+            min={0}
+            max={Math.max(0, (pixelFixerControls.pitch || 8) - 1)}
+            value={pixelFixerControls.offsetX}
+            onChange={(v) => onPixelFixerControlsChange({ offsetX: v })}
+          />
+          <RangeRow
+            label="Offset Y"
+            id="pixelFixOffsetY"
+            min={0}
+            max={Math.max(0, (pixelFixerControls.pitch || 8) - 1)}
+            value={pixelFixerControls.offsetY}
+            onChange={(v) => onPixelFixerControlsChange({ offsetY: v })}
+          />
+          <RangeRow
+            label="Min pitch"
+            id="pixelFixMinPitch"
+            min={2}
+            max={32}
+            value={pixelFixerControls.minPitch}
+            onChange={(v) => onPixelFixerControlsChange({ minPitch: v })}
+          />
+          <RangeRow
+            label="Max pitch"
+            id="pixelFixMaxPitch"
+            min={4}
+            max={64}
+            value={pixelFixerControls.maxPitch}
+            onChange={(v) => onPixelFixerControlsChange({ maxPitch: v })}
+          />
+        </ControlCard>
+      </div>
+      )}
+
       {showAi && (
       <div
         class="control-panel active"
@@ -608,3 +710,4 @@ ControlsPanel.defaultNormalControls = DEFAULT_NORMAL;
 ControlsPanel.defaultSpecularControls = DEFAULT_SPECULAR;
 ControlsPanel.defaultParallaxControls = DEFAULT_PARALLAX;
 ControlsPanel.defaultOcclusionControls = DEFAULT_OCCLUSION;
+ControlsPanel.defaultPixelFixerControls = DEFAULT_PIXEL_FIXER;

@@ -154,3 +154,28 @@ export function buildOcclusionParams(controls, pixelSize = 1) {
     pixelSize: Number(pixelSize) || 1,
   };
 }
+
+// Pixel-fixer UI values. pitch 0 = auto-detect; selecting a candidate or
+ // dragging pitch/offset writes explicit lattice params for reconstruction.
+export const DEFAULT_PIXEL_FIXER = {
+  minPitch: 4,
+  maxPitch: 64,
+  candidateCount: 3,
+  alphaThreshold: 16,
+  pitch: 0,
+  offsetX: 0,
+  offsetY: 0,
+  candidateIndex: 0,
+};
+
+export function buildPixelFixerParams(controls) {
+  return {
+    minPitch: Number(controls.minPitch),
+    maxPitch: Number(controls.maxPitch),
+    candidateCount: Number(controls.candidateCount),
+    alphaThreshold: Number(controls.alphaThreshold),
+    pitch: Number(controls.pitch),
+    offsetX: Number(controls.offsetX),
+    offsetY: Number(controls.offsetY),
+  };
+}

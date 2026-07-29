@@ -162,3 +162,10 @@ present. Consistent with the escape hatch: still reclaimable.
   expose it. These are pipeline-correction flags for CLI/batch use; in the
   browser the user can flip the source image instead. Documented here so it
   is not mistaken for an unfinished feature.
+- **Pixel Fixer (Strict-grid MVP, experimental)** — `shared/pixelFixer.js`
+  detects a global square lattice (pitch + offset), reconstructs one median
+  colour per cell, and returns top candidates. Wired as a rough Pixel Fix
+  preview/control tab and `cli/normalizer.js pixelfix`. Not ordinary
+  pixelation: the export is the real low-res sprite. Warped lattices,
+  outline repair, palette clustering, and batch/frame consistency are out
+  of scope for this MVP.
