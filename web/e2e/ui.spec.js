@@ -149,4 +149,31 @@ test.describe("Normal Map Generator UI", () => {
     const path = await download.path();
     expect(path).toBeTruthy();
   });
+
+  test("save project downloads a .normalizer file", async ({ page }) => {
+    await expect(page.locator("#saveProjectButton")).toBeEnabled();
+    const downloadPromise = page.waitForEvent("download", { timeout: 15000 });
+    await page.locator("#saveProjectButton").click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.normalizer$/i);
+    await expect(page.locator("#status")).toContainText(/Saved/i);
+  });
+
+  test("open project restores controls from a .normalizer file", async ({ page }) => {
+    await page.locator("#diffuseIntensity").fill("200");
+    await expect(page.locator("#diffuseIntensity")).toHaveValue("200");
+
+    const downloadPromise = page.waitForEvent("download", { timeout: 15000 });
+    await page.locator("#saveProjectButton").click();
+    const download = await downloadPromise;
+    const projectPath = await download.path();
+    expect(projectPath).toBeTruthy();
+
+    await page.locator("#diffuseIntensity").fill("10");
+    await expect(page.locator("#diffuseIntensity")).toHaveValue("10");
+
+    await page.locator("#projectInput").setInputFiles(projectPath);
+    await expect(page.locator("#status")).toContainText(/project loaded/i, { timeout: 10000 });
+    await expect(page.locator("#diffuseIntensity")).toHaveValue("200");
+  });
 });

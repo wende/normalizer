@@ -76,6 +76,10 @@ inventory in REWRITE_PLAN.md §2.
 8. ❌ **Node CLI batch export** — NOT STARTED. `cli/normalizer.js` is
    single-input/single-output, `normal`/`specular`/`parallax`/`occlusion`
    subcommands only; no folder scan, suffixes, recursion, or `--check-changes`.
+9. ✅ ~~**`.normalizer` project save/load (Web UI)**~~ — DONE. Full-snapshot
+   ZIP (`project.json` + `source.png` + generated map PNGs + optional
+   `ai-normal.png`). Toolbar **Save Project** / **Open Project**; no CLI;
+   no `.laigter` import. See `web/src/projectFile.js`.
 
 ## 2. Implement cheaply alongside (hygiene, not features)
 
@@ -92,8 +96,10 @@ inventory in REWRITE_PLAN.md §2.
   full conversion (drop upstream comparison, keep only self-regression) is
   not done. See `PREVIEW_GOLDEN_STRATEGY.md`.
 - ✅ ~~**Unit tests wired into npm**~~ — DONE. `npm test` runs
-  `tests/specular.test.js`, `tests/parallax.test.js`, and
-  `tests/occlusion.test.js`.
+  `tests/specular.test.js`, `tests/parallax.test.js`,
+  `tests/occlusion.test.js`, `tests/flat-plane-offset.test.js`,
+  `tests/preview-occlusion.test.js`, `tests/pixelScale.test.js`,
+  `tests/exportPack.test.js`, and `tests/projectFile.test.js`.
 
 ## 3. Defer (real value, wrong time — with re-entry triggers)
 
@@ -104,7 +110,6 @@ inventory in REWRITE_PLAN.md §2.
 | Custom heightmap / specular base inputs (UI) | §2 "Inputs" | User demand. Generation code keeps accepting an optional height/specular source so only UI is missing. | 🟡 Partial — `generateSpecularMap(source, p, specularBase = source)` and `generateParallaxMap(source, p, height = source, bevelDistance = null)` accept optional sources; no UI loaders exist. `generateNormalMap` still takes no height/spec source. |
 | Tauri desktop packaging | §3 Phase 3.1 | Only if folder-watch or distribution to non-terminal users becomes a goal; Node CLI covers batch until then. | ❌ Still deferred. |
 | Performance budget validation | §3 Phase 4.3 | Don't formalize; log recompute time in dev, look at it as each map lands. | ❌ Still deferred (no recompute-time logging in `web/`). |
-| New project zip format | §3 Phase 3.6 | Project firms up into a product. Until then: JSON settings export alongside PNGs. | 🟡 Partial — engine-facing **Export Pack** (`normalizer.json` + maps ZIP) shipped in the web UI; full project snapshot (controls + AI overlay) still deferred. |
 
 ## 4. Drop (invalidated by the decisions above)
 

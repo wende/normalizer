@@ -31,8 +31,26 @@ includes the upstream Pixelated/Toon render toggles.
 **Export PNG** downloads the currently visible map using the suffix convention
 (`{name}_normal.png`, `{name}_height.png` for parallax, `{name}_ao.png`, …).
 **Export Pack** downloads a ZIP folder with every map plus `normalizer.json`
-(engine-facing material manifest — no Godot/Unity assets yet). No server-side
-processing is required for any of it.
+(engine-facing material manifest — no Godot/Unity assets yet).
+**Save Project** / **Open Project** write and restore a `.normalizer` ZIP
+(source + maps + `project.json`). No server-side processing is required for
+any of it.
+
+## `.normalizer` project files
+
+A `.normalizer` file is a ZIP containing:
+
+| Entry | Role |
+|---|---|
+| `project.json` | Format/version, pipeline, preview/UI state, all control groups |
+| `source.png` | Diffuse/source image (required) |
+| `normal.png` | Procedural normal (optional) |
+| `specular.png` / `parallax.png` / `occlusion.png` | Generated maps (optional) |
+| `ai-normal.png` | Raw DeepBump overlay before Adjust sliders (optional) |
+
+Open restores embedded maps without immediately regenerating them; later
+slider changes recompute as usual. Export PNG remains a single-map download;
+Export Pack is a separate engine-facing material ZIP.
 
 ## AI normal generator (DeepBump, in the browser)
 
