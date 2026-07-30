@@ -8,6 +8,11 @@ import { generateNormalMap } from "shared/normal.js";
 import { generateSpecularMap } from "shared/specular.js";
 import { generateParallaxMap } from "shared/parallax.js";
 import { generateOcclusionMap } from "shared/occlusion.js";
+import {
+  detectPixelGrid,
+  reconstructPixelGrid,
+  upscaleNearest,
+} from "shared/pixelFixer.js";
 import { buildLitPreview, DEFAULT_LIGHT_PARAMS } from "shared/preview.js";
 import { flatPlaneUvOffset } from "./flatPlaneOffset.js";
 
@@ -148,6 +153,36 @@ export function generateOcclusion(source, params) {
   return new ImageData(out.data, out.width, out.height);
 }
 
+/**
+ * Auto-detect grid candidates. Each candidate carries a low-res sprite
+ * ImageData plus lattice metadata for the Pixel Fix panel.
+ */
+export function detectPixelFix(source, params) {
+  const { candidates } = detectPixelGrid(source, params);
+  return candidates.map((c) => ({
+    pitch: c.pitch,
+    offsetX: c.offsetX,
+    offsetY: c.offsetY,
+    cols: c.cols,
+    rows: c.rows,
+    score: c.score,
+    sprite: new ImageData(c.sprite.data, c.sprite.width, c.sprite.height),
+  }));
+}
+
+/** Reconstruct a single lattice; returns { sprite, preview } as ImageData. */
+export function reconstructPixelFix(source, lattice) {
+  const spriteRec = reconstructPixelGrid(source, lattice);
+  if (!spriteRec.width || !spriteRec.height) {
+    return { sprite: null, preview: null };
+  }
+  const previewRec = upscaleNearest(spriteRec, spriteRec.pitch);
+  return {
+    sprite: new ImageData(spriteRec.data, spriteRec.width, spriteRec.height),
+    preview: new ImageData(previewRec.data, previewRec.width, previewRec.height),
+  };
+}
+
 export function renderLit(source, normal, lightSettings, toon, specular = null, occlusion = null) {
   const out = buildLitPreview(source, normal, lightSettings, toon, specular, occlusion);
   return new ImageData(out.data, out.width, out.height);
@@ -245,6 +280,7 @@ export function drawPreview({
   specular,
   parallax,
   occlusion,
+  pixelfix,
   litCache,
   mode,
   pipeline,
@@ -274,10 +310,14 @@ export function drawPreview({
   }
 
   // Only the Base view renders without a generated map. Specular/Parallax/
-  // Occlusion need their own map; Split/Lit/Normal need a normal map — and in
-  // the AI pipeline "no normal yet" means "not generated", so show a hint
-  // rather than a blank.
-  const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax" && mode !== "occlusion";
+  // Occlusion/PixelFix need their own map; Split/Lit/Normal need a normal map —
+  // and in the AI pipeline "no normal yet" means "not generated", so show a
+  // hint rather than a blank.
+  const needsNormal = mode !== "base"
+    && mode !== "specular"
+    && mode !== "parallax"
+    && mode !== "occlusion"
+    && mode !== "pixelfix";
   if (needsNormal && !normal) {
     if (pipeline === "ai") {
       drawAiPlaceholder(ctx, canvas);
@@ -293,11 +333,15 @@ export function drawPreview({
   if (mode === "occlusion" && !occlusion) {
     return null;
   }
+  if (mode === "pixelfix" && !pixelfix) {
+    return null;
+  }
 
+  const fitSrc = mode === "pixelfix" && pixelfix ? pixelfix : source;
   const pad = Math.min(48, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
   const rect = fitRect(
-    source.width,
-    source.height,
+    fitSrc.width,
+    fitSrc.height,
     Math.max(1, canvas.width - pad * 2),
     Math.max(1, canvas.height - pad * 2),
   );
@@ -311,6 +355,8 @@ export function drawPreview({
     drawImageData(ctx, parallax, rect, pixelated);
   } else if (mode === "occlusion") {
     drawImageData(ctx, occlusion, rect, pixelated);
+  } else if (mode === "pixelfix") {
+    drawImageData(ctx, pixelfix, rect, true);
   } else if (mode === "lit") {
     drawImageData(ctx, litCache || normal, rect, pixelated);
   } else if (mode === "normal") {
@@ -341,7 +387,9 @@ export function drawPreview({
     ctx.lineTo(splitX, rect.y + rect.height);
     ctx.stroke();
   }
-  drawLightHandle(ctx, light, source, rect, draggingLight, lightSprite);
+  if (mode !== "pixelfix") {
+    drawLightHandle(ctx, light, source, rect, draggingLight, lightSprite);
+  }
   return rect;
 }
 

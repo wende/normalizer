@@ -11,10 +11,12 @@ import {
   DEFAULT_SPECULAR,
   DEFAULT_PARALLAX,
   DEFAULT_OCCLUSION,
+  DEFAULT_PIXEL_FIXER,
   buildNormalParams,
   buildSpecularParams,
   buildParallaxParams,
   buildOcclusionParams,
+  buildPixelFixerParams,
 } from "./controls.js";
 import {
   buildLightSettings,
@@ -23,6 +25,8 @@ import {
   generateSpecular,
   generateParallax,
   generateOcclusion,
+  detectPixelFix,
+  reconstructPixelFix,
   readSourceFromImage,
   canvasToLight,
 } from "./previewRender.js";
@@ -64,6 +68,9 @@ export function App() {
   const [specularMap, setSpecularMap] = useState(null);
   const [parallaxMap, setParallaxMap] = useState(null);
   const [occlusionMap, setOcclusionMap] = useState(null);
+  const [pixelFixSprite, setPixelFixSprite] = useState(null);
+  const [pixelFixPreview, setPixelFixPreview] = useState(null);
+  const [pixelFixCandidates, setPixelFixCandidates] = useState([]);
   const [aiOverlay, setAiOverlay] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [pipeline, setPipeline] = useState("ai"); // "procedural" | "ai"
@@ -78,6 +85,7 @@ export function App() {
   const [specularControls, setSpecularControls] = useState(DEFAULT_SPECULAR);
   const [parallaxControls, setParallaxControls] = useState(DEFAULT_PARALLAX);
   const [occlusionControls, setOcclusionControls] = useState(DEFAULT_OCCLUSION);
+  const [pixelFixerControls, setPixelFixerControls] = useState(DEFAULT_PIXEL_FIXER);
   const [lightControls, setLightControls] = useState(DEFAULT_LIGHT_CONTROLS);
   const [aiControls, setAiControls] = useState(DEFAULT_AI_CONTROLS);
   const [sourceName, setSourceName] = useState(SAMPLE_BASE_NAME);
@@ -90,6 +98,7 @@ export function App() {
   const specularTimer = useRef(0);
   const parallaxTimer = useRef(0);
   const occlusionTimer = useRef(0);
+  const pixelFixTimer = useRef(0);
   const aiWorker = useRef(null);
   // When hydrating a .normalizer, skip the next recompute ticks so embedded
   // maps are not overwritten by a regenerate from the restored sliders.
@@ -155,6 +164,9 @@ export function App() {
   }, []);
   const onOcclusionControlsChange = useCallback((patch) => {
     setOcclusionControls((prev) => ({ ...prev, ...patch }));
+  }, []);
+  const onPixelFixerControlsChange = useCallback((patch) => {
+    setPixelFixerControls((prev) => ({ ...prev, ...patch }));
   }, []);
   const onLightControlsChange = useCallback((patch) => {
     setLightControls((prev) => ({ ...prev, ...patch }));
@@ -289,6 +301,100 @@ export function App() {
     return () => clearTimeout(occlusionTimer.current);
   }, [source, occlusionControls, lightControls.pixelSize]);
 
+  // Pixel-fixer — ONLY runs when the Pixel Fix tab or preview mode is active.
+  // Detect is opt-in (button) / one-shot on first visit; never on every image
+  // load. Full auto-detect on a 1k² source was blocking the UI for ~10s+.
+  const pixelFixActive = mode === "pixelfix" || tab === "pixelfix";
+
+  const runPixelFixDetect = useCallback(() => {
+    if (!source) return;
+    const params = buildPixelFixerParams({
+      ...pixelFixerControls,
+      pitch: 0,
+      offsetX: -1,
+      offsetY: -1,
+    });
+    setStatus("Pixel fix: detecting…");
+    // Yield so the status paint lands before the sync detect blocks.
+    setTimeout(() => {
+      const t0 = performance.now();
+      const candidates = detectPixelFix(source, params);
+      setPixelFixCandidates(candidates);
+      if (!candidates.length) {
+        setPixelFixSprite(null);
+        setPixelFixPreview(null);
+        setStatus("Pixel fix: no grid candidates");
+        return;
+      }
+      const idx = Math.min(pixelFixerControls.candidateIndex, candidates.length - 1);
+      const best = candidates[idx];
+      setPixelFixerControls((prev) => ({
+        ...prev,
+        candidateIndex: idx,
+        pitch: best.pitch,
+        offsetX: best.offsetX,
+        offsetY: best.offsetY,
+      }));
+      const { sprite, preview } = reconstructPixelFix(source, {
+        pitch: best.pitch,
+        offsetX: best.offsetX,
+        offsetY: best.offsetY,
+        alphaThreshold: pixelFixerControls.alphaThreshold,
+      });
+      setPixelFixSprite(sprite);
+      setPixelFixPreview(preview);
+      setStatus(
+        `Pixel fix: ${best.cols}×${best.rows} @ pitch ${best.pitch} (${Math.round(performance.now() - t0)} ms)`,
+      );
+    }, 0);
+  }, [source, pixelFixerControls.minPitch, pixelFixerControls.maxPitch, pixelFixerControls.candidateCount, pixelFixerControls.alphaThreshold, pixelFixerControls.candidateIndex]);
+
+  // Reconstruct when lattice knobs change — only while Pixel Fix is visible.
+  useEffect(() => {
+    if (!source || !pixelFixActive) return;
+    if (!pixelFixerControls.pitch) return;
+    clearTimeout(pixelFixTimer.current);
+    pixelFixTimer.current = setTimeout(() => {
+      const { sprite, preview } = reconstructPixelFix(source, {
+        pitch: pixelFixerControls.pitch,
+        offsetX: pixelFixerControls.offsetX,
+        offsetY: pixelFixerControls.offsetY,
+        alphaThreshold: pixelFixerControls.alphaThreshold,
+      });
+      setPixelFixSprite(sprite);
+      setPixelFixPreview(preview);
+      if (sprite) {
+        setStatus(`Pixel fix: ${sprite.width}×${sprite.height} @ pitch ${pixelFixerControls.pitch}`);
+      }
+    }, 80);
+    return () => clearTimeout(pixelFixTimer.current);
+  }, [
+    source,
+    pixelFixActive,
+    pixelFixerControls.pitch,
+    pixelFixerControls.offsetX,
+    pixelFixerControls.offsetY,
+    pixelFixerControls.alphaThreshold,
+  ]);
+
+  // First visit to Pixel Fix with no lattice yet → run detect once.
+  const pixelFixAutoRan = useRef(false);
+  useEffect(() => {
+    if (!pixelFixActive || !source) return;
+    if (pixelFixerControls.pitch || pixelFixCandidates.length) {
+      pixelFixAutoRan.current = true;
+      return;
+    }
+    if (pixelFixAutoRan.current) return;
+    pixelFixAutoRan.current = true;
+    runPixelFixDetect();
+  }, [pixelFixActive, source, pixelFixerControls.pitch, pixelFixCandidates.length, runPixelFixDetect]);
+
+  // Reset the one-shot flag when the source image changes.
+  useEffect(() => {
+    pixelFixAutoRan.current = false;
+  }, [source]);
+
   // Lit preview is rendered on the GPU by litGL (PreviewArea) — light moves
   // only update a shader uniform, so no ImageData is rebuilt per drag here.
   const drawArgs = useMemo(() => ({
@@ -297,6 +403,7 @@ export function App() {
     specular: specularMap,
     parallax: parallaxMap,
     occlusion: occlusionMap,
+    pixelfix: pixelFixPreview,
     mode,
     pipeline,
     light,
@@ -313,7 +420,7 @@ export function App() {
     onDragChange: (d) => { draggingLight.current = d; },
     onSplitDragChange: setDraggingSplit,
   }), [
-    source, activeNormal, specularMap, parallaxMap, occlusionMap,
+    source, activeNormal, specularMap, parallaxMap, occlusionMap, pixelFixPreview,
     mode, pipeline, light, viewTilt, parallaxControls.previewParallaxDepth,
     splitRatio, draggingSplit, lightControls,
   ]);
@@ -360,6 +467,10 @@ export function App() {
     if (aiNormalImage) setPipeline("ai");
     setLight({ x: data.width * 0.4, y: data.height * 0.4 });
     setViewTilt({ x: 0, y: 0 });
+    setPixelFixCandidates([]);
+    setPixelFixSprite(null);
+    setPixelFixPreview(null);
+    setPixelFixerControls((prev) => ({ ...prev, pitch: 0, offsetX: 0, offsetY: 0, candidateIndex: 0 }));
     return { width: data.width, height: data.height, pixelSize: detected };
   }, []);
 
@@ -405,8 +516,12 @@ export function App() {
     if (mode === "parallax") return exportPng(parallaxMap, singleMapFilename(base, "height"));
     if (mode === "occlusion") return exportPng(occlusionMap, singleMapFilename(base, "occlusion"));
     if (mode === "base") return exportPng(source, singleMapFilename(base, "albedo"));
+    if (mode === "pixelfix") {
+      const stem = String(base).replace(/^.*[/\\]/, "").replace(/\.(png|jpe?g|webp|gif)$/i, "") || "texture";
+      return exportPng(pixelFixSprite, `${stem}_pixelfix.png`);
+    }
     return exportPng(activeNormal, singleMapFilename(base, "normal"));
-  }, [mode, sourceName, source, specularMap, parallaxMap, occlusionMap, activeNormal]);
+  }, [mode, sourceName, source, specularMap, parallaxMap, occlusionMap, activeNormal, pixelFixSprite]);
 
   const onExportPack = useCallback(async () => {
     if (!source) {
@@ -574,6 +689,10 @@ export function App() {
           onParallaxControlsChange={onParallaxControlsChange}
           occlusionControls={occlusionControls}
           onOcclusionControlsChange={onOcclusionControlsChange}
+          pixelFixerControls={pixelFixerControls}
+          onPixelFixerControlsChange={onPixelFixerControlsChange}
+          pixelFixerCandidates={pixelFixCandidates}
+          onPixelFixerDetect={runPixelFixDetect}
           lightControls={lightControls}
           onLightControlsChange={onLightControlsChange}
           aiControls={aiControls}
