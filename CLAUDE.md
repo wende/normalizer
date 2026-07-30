@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository. `AGENTS.md` is a symlink to it, so both names resolve to this one file — edit here, never fork the content.
 
 ## Project
 
@@ -10,6 +10,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Node CLI (`cli/normalizer.js`) — uses `pngjs` for PNG I/O, ES modules.
 
 Both import pure-function algorithms from `shared/`. Upstream Laigter lives in `laigter/` as the porting reference and license root; the C++ rewrite (`core/`) is on the way out per `docs/NORMALIZER_FEATURES.md`.
+
+## `laigter/` is a reference, not a source
+
+`laigter/` is a **git submodule** pinned to upstream [azagaya/laigter](https://github.com/azagaya/laigter) (Qt/C++). It is read-only reference material: the **porting reference** for algorithm parity and the **license root** for our GPL-3.0 derivation. It is not part of the product.
+
+- **Never edit anything under `laigter/`.** It tracks upstream, and a local edit both silently dirties the submodule and destroys its value as a parity reference. Fix our code in `shared/`, `cli/`, or `web/` instead.
+- **No shipped code imports it.** `shared/`, `cli/`, and `web/src/` must never depend on it at runtime. Where our code is *derived* from it — e.g. `web/src/litGL.js` from `laigter/shaders/fshader.glsl` — that's a header comment crediting the port, not a dependency.
+- **Never take assets from `laigter/`** — not sample art, icons, screenshots, or fixtures. Its images (`laigter/images/sample.png`, the presskit, the flags) are upstream's, not our samples. Use ours (below).
+
+Read it to answer "what does upstream do here?" when porting a parameter or chasing a golden mismatch. The only build-level uses are reference-shaped and both belong to the retiring C++ path: the `Makefile` adds `-Ilaigter/thirdparty` for CImg, and `make regenerate-goldens-local` builds `laigter.pro` to produce an upstream binary for goldens.
+
+Known exception, not a precedent: `make smoke` still feeds `laigter/images/sample.png` to the C++ CLI. It predates this rule and should move to `web/demo.png` when that target is touched.
+
+### Our own sample and fixture assets
+
+When you need an input image — a demo, a doc screenshot, a manual e2e, an engine-integration check — use ours:
+
+| Asset | What it is |
+|---|---|
+| `web/demo.png` | The sample the web UI loads (`SAMPLE_SRC` in `web/src/App.jsx`); base name `demo`, which is what an Export Pack is named. The default choice for anything demo- or integration-shaped. |
+| `web/demo_ai_normal.png` | Precomputed AI normal for the same sample, used by the DeepBump path. |
+| `tests/fixtures/inputs/generated/*.png` | Synthetic tolerance probes from `scripts/generate_fixture_images.py` (`hard_edges`, `alpha_badge`, `soft_gradient_alpha`, …). Made for the golden harness — right for parity/tolerance work, wrong for anything visual. |
 
 ## Commands
 
@@ -66,7 +88,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 
 ### Serving the web app
 
-- `make web` runs Vite (`vite.config.js`): it transforms the JSX under `web/src/`, serves `web/`, and also serves `laigter/` and `shared/` from the repo root (used to load upstream sample images and shared modules). Vite is the normal dev path.
+- `make web` runs Vite (`vite.config.js`): it transforms the JSX under `web/src/`, serves `web/`, and also serves `shared/` from the repo root (the app imports the shared modules directly). Vite is the normal dev path. `web/server.js` also happens to serve `/laigter/` from the repo root, but nothing in `web/src/` fetches it — the app's sample is `web/demo.png`.
 - `web/server.js` is a dependency-free static server for the same tree (no JSX transform); `make web-static` is the equivalent via `python3 -m http.server`. Both exist for no-build/offline checks.
 - The AI pipeline runs DeepBump via `web/deepbump.worker.js` in a Web Worker — no server endpoint is involved. The worker loads `onnxruntime-web` from a CDN, fetches and caches `deepbump256.onnx`, and runs tiled inference. See `web/README.md` for the controls and local-model fallback.
 
@@ -89,6 +111,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 
 ## Things to know before editing
 
+- `laigter/` is read-only upstream — never edit it, import from it, or pull sample art out of it. Our sample is `web/demo.png`. See "`laigter/` is a reference, not a source" above.
 - The browser and CLI both load `shared/` modules directly. Editing `shared/normal.js` affects both; verify with `make js-smoke` after non-trivial changes.
 - `alphaDistance` is the most expensive primitive and is currently recomputed on every slider tick (the debounced recompute `useEffect`s in `web/src/App.jsx`). Cache hooks are planned in `docs/JS_CORE_MIGRATION.md` §5.8 but not yet wired.
 - `gaussianBlur` diverges from CImg by a few LSB at borders / large sigma; this is accepted under "free to diverge" but documented in the function header.
