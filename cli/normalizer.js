@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /*
- * normalizer CLI — normal-, specular-, parallax-, occlusion-, and pixelfix-map
- * generation.
+ * normalizer CLI — normal-, specular-, parallax-, and occlusion-map generation.
  *
  * Derived from Laigter's GPL-3.0 logic; mirrors the argument/exit contract of
  * core/tools/laigter_core_cli.cpp so scripts/run_core_cases.py can drive either
@@ -14,7 +13,6 @@ import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
 import { generateSpecularMap, DEFAULT_SPECULAR_PARAMS } from "../shared/specular.js";
 import { generateParallaxMap, DEFAULT_PARALLAX_PARAMS } from "../shared/parallax.js";
 import { generateOcclusionMap, DEFAULT_OCCLUSION_PARAMS } from "../shared/occlusion.js";
-import { fixPixels, DEFAULT_PIXEL_FIXER_PARAMS } from "../shared/pixelFixer.js";
 
 const { PNG } = pngjs;
 
@@ -26,7 +24,6 @@ const USAGE = [
   "  specular                         generate a specular reflectivity map",
   "  parallax                         generate a parallax (height) map",
   "  occlusion                        generate an ambient-occlusion map",
-  "  pixelfix                         recover a low-res sprite from pseudo-pixel art",
   "",
   "normal options:",
   "  --normal-depth <int>             emboss strength (default 250)",
@@ -73,14 +70,6 @@ const USAGE = [
   "  --occlusion-invert               invert the map",
   "  --use-occlusion-alpha            copy the source alpha into the output",
   "  --pixel-size <int>               art-pixel block size (default 1)",
-  "",
-  "pixelfix options:",
-  "  --pitch <int>                    cell size in source pixels (0 = auto)",
-  "  --offset-x <int>                 grid origin X (-1 = auto)",
-  "  --offset-y <int>                 grid origin Y (-1 = auto)",
-  "  --min-pitch <int>                auto-detect lower bound (default 4)",
-  "  --max-pitch <int>                auto-detect upper bound (default 64)",
-  "  --alpha-threshold <int>          opaque sample cutoff (default 16)",
 ].join("\n");
 
 function failUsage(message) {
@@ -285,42 +274,11 @@ function parseOcclusionFlags(args) {
   return params;
 }
 
-function parsePixelFixFlags(args) {
-  const params = { ...DEFAULT_PIXEL_FIXER_PARAMS };
-  for (let i = 3; i < args.length; i += 1) {
-    const arg = args[i];
-    switch (arg) {
-      case "--pitch":
-        params.pitch = parseInt32(requireValue(args, (i += 1), arg), arg);
-        break;
-      case "--offset-x":
-        params.offsetX = parseInt32(requireValue(args, (i += 1), arg), arg);
-        break;
-      case "--offset-y":
-        params.offsetY = parseInt32(requireValue(args, (i += 1), arg), arg);
-        break;
-      case "--min-pitch":
-        params.minPitch = parseInt32(requireValue(args, (i += 1), arg), arg);
-        break;
-      case "--max-pitch":
-        params.maxPitch = parseInt32(requireValue(args, (i += 1), arg), arg);
-        break;
-      case "--alpha-threshold":
-        params.alphaThreshold = parseInt32(requireValue(args, (i += 1), arg), arg);
-        break;
-      default:
-        fail(`unknown option: ${arg}`);
-    }
-  }
-  return params;
-}
-
 const PARSERS = {
   normal: parseNormalFlags,
   specular: parseSpecularFlags,
   parallax: parseParallaxFlags,
   occlusion: parseOcclusionFlags,
-  pixelfix: parsePixelFixFlags,
 };
 
 function parseArgs(args) {
@@ -349,7 +307,6 @@ const GENERATORS = {
   specular: generateSpecularMap,
   parallax: generateParallaxMap,
   occlusion: generateOcclusionMap,
-  pixelfix: fixPixels,
 };
 
 const { command, inputPath, outputPath, params } = parseArgs(process.argv.slice(2));
