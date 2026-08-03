@@ -168,8 +168,8 @@ export function createLitGL(canvas) {
   gl.bindVertexArray(null);
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture(), parallax: gl.createTexture(), occlusion: gl.createTexture(), pixelfix: gl.createTexture() };
-  const ref = { source: null, normal: null, specular: null, parallax: null, occlusion: null, pixelfix: null };
+  const tex = { source: gl.createTexture(), normal: gl.createTexture(), specular: gl.createTexture(), parallax: gl.createTexture(), occlusion: gl.createTexture() };
+  const ref = { source: null, normal: null, specular: null, parallax: null, occlusion: null };
 
   function upload(key, image, pixelated) {
     if (!image) return;
@@ -266,7 +266,7 @@ export function createLitGL(canvas) {
    */
   function draw(state) {
     const {
-      source, normal, specular, parallax, occlusion, pixelfix, mode, lightSettings, toon, pixelated,
+      source, normal, specular, parallax, occlusion, mode, lightSettings, toon, pixelated,
       splitRatio = 0.5, viewTilt, heightScale,
     } = state;
     const ratio = window.devicePixelRatio || 1;
@@ -286,20 +286,14 @@ export function createLitGL(canvas) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     if (!source) return null;
-    const needsNormal = mode !== "base"
-      && mode !== "specular"
-      && mode !== "parallax"
-      && mode !== "occlusion"
-      && mode !== "pixelfix";
+    const needsNormal = mode !== "base" && mode !== "specular" && mode !== "parallax" && mode !== "occlusion";
     if (needsNormal && !normal) return null; // overlay draws the AI placeholder
     if (mode === "specular" && !specular) return null;
     if (mode === "parallax" && !parallax) return null;
     if (mode === "occlusion" && !occlusion) return null;
-    if (mode === "pixelfix" && !pixelfix) return null;
 
-    const fitSrc = mode === "pixelfix" && pixelfix ? pixelfix : source;
     const pad = Math.min(48, Math.round(Math.min(cw, ch) * 0.04));
-    const rect = fitRect(fitSrc.width, fitSrc.height, Math.max(1, cw - pad * 2), Math.max(1, ch - pad * 2));
+    const rect = fitRect(source.width, source.height, Math.max(1, cw - pad * 2), Math.max(1, ch - pad * 2));
     // Center the fitted image in the full canvas (fitRect origin is relative to the padded box).
     rect.x += pad;
     rect.y += pad;
@@ -316,8 +310,6 @@ export function createLitGL(canvas) {
       drawPassthrough("parallax", parallax, pixelated);
     } else if (mode === "occlusion") {
       drawPassthrough("occlusion", occlusion, pixelated);
-    } else if (mode === "pixelfix") {
-      drawPassthrough("pixelfix", pixelfix, true);
     } else if (mode === "normal") {
       drawPassthrough("normal", normal, pixelated);
     } else if (mode === "lit") {
@@ -410,7 +402,6 @@ export function createLitGL(canvas) {
       ref.specular = null;
       ref.parallax = null;
       ref.occlusion = null;
-      ref.pixelfix = null;
       if (max > 3) {
         console.warn(`[litGL] shader/CPU parity delta = ${max} (expected ≤3 LSB)`);
       } else {
