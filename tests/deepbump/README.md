@@ -1,9 +1,10 @@
-# DeepBump CLI (experiment)
+# DeepBump reference implementation and tests
 
-Standalone test tool: color image → tangent-space normal map, using
-[DeepBump](https://github.com/HugoTini/DeepBump)'s pretrained model. This is a
-scratch experiment to evaluate ML-inferred normals — **not** wired into the
-normalizer pipeline.
+Python reference CLI and parity check for the browser DeepBump pipeline
+(`web/deepbump_infer.js` + `web/deepbump.worker.js`), using
+[DeepBump](https://github.com/HugoTini/DeepBump)'s pretrained model. The AI
+pipeline is a main project component; this directory is the reference
+implementation and fixtures that pin the JS port to upstream output.
 
 Unlike a text-to-image model, DeepBump is *conditioned on your image*: it
 regresses per-pixel surface orientation aligned to the input texture, so the
