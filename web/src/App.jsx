@@ -45,7 +45,6 @@ import { detectPixelSize, pixelateNormalMap } from "shared/pixelScale.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
-const LIGHT_SPRITE_SRC = "./light_sprite.svg";
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
 const SAMPLE_BASE_NAME = "demo";
 const HYDRATE_SKIP_MS = 100;
@@ -85,7 +84,6 @@ export function App() {
   const [projectFilename, setProjectFilename] = useState("project.normalizer");
   const lastRect = useRef(null);
   const draggingLight = useRef(false);
-  const lightSprite = useRef(null);
   const generateTimer = useRef(0);
   const specularTimer = useRef(0);
   const parallaxTimer = useRef(0);
@@ -135,14 +133,6 @@ export function App() {
   // maps are never mixed. Everything downstream (Lit/Split/Normal views, Export)
   // reads this one value.
   const activeNormal = pipeline === "ai" ? aiNormal : proceduralDisplay;
-
-  // Load the light sprite once on mount so it's ready when drawPreview runs.
-  useEffect(() => {
-    const img = new Image();
-    img.decoding = "async";
-    img.src = LIGHT_SPRITE_SRC;
-    lightSprite.current = img;
-  }, []);
 
   const onNormalControlsChange = useCallback((patch) => {
     setNormalControls((prev) => ({ ...prev, ...patch }));
@@ -308,7 +298,6 @@ export function App() {
     pixelated: lightControls.pixelated || lightControls.pixelSize > 1,
     draggingLight: draggingLight.current,
     draggingSplit,
-    lightSprite: lightSprite.current,
     onRectChange: (rect) => { lastRect.current = rect; },
     onDragChange: (d) => { draggingLight.current = d; },
     onSplitDragChange: setDraggingSplit,
@@ -558,7 +547,6 @@ export function App() {
             onViewTilt={onViewTilt}
             onSplitRatioChange={onSplitRatioChange}
             splitRatio={splitRatio}
-            lightSprite={lightSprite.current}
             lastRectRef={lastRect}
           />
         <ControlsPanel

@@ -9,14 +9,13 @@ const require = createRequire(import.meta.url);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)));
 const webRoot = resolve(repoRoot, "web");
 
-// Root-served assets the SPA loads by absolute path (workers, sample, light sprite).
+// Root-served assets the SPA loads by absolute path (workers, sample).
 // Vite only auto-copies `public/`; keep these next to index.html for static/dev servers.
 const ROOT_STATIC_ASSETS = [
   "deepbump.worker.js",
   "deepbump_infer.js",
   "demo.png",
   "demo_ai_normal.png",
-  "light_sprite.svg",
 ];
 
 function copyRootStaticAssets() {

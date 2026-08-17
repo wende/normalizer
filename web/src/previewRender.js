@@ -192,21 +192,28 @@ function drawImageData(ctx, imageData, rect, pixelated, uvOffset = null) {
   ctx.restore();
 }
 
-export function drawLightHandle(ctx, light, source, rect, dragging, lightSprite) {
+function rgb01ToCss(rgb, alpha) {
+  const [r, g, b] = rgb || [1, 0.95, 0.7];
+  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${alpha})`;
+}
+
+export function drawLightHandle(ctx, light, source, rect, dragging, color) {
   const ratio = window.devicePixelRatio || 1;
   const pos = lightToCanvas(light, source, rect);
   const size = lightHandleSize(ratio);
+  const rgb = color || [1, 0.95, 0.7];
   ctx.save();
   ctx.globalAlpha = dragging ? 1 : 0.94;
-  if (lightSprite && lightSprite.complete && lightSprite.naturalWidth > 0) {
-    ctx.drawImage(lightSprite, pos.x - size * 0.5, pos.y - size * 0.5, size, size);
-  } else {
-    ctx.fillStyle = "#dff8ee";
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, size * 0.36, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = dragging ? "#fffefa" : "rgba(255, 254, 250, 0.76)";
+  const glow = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, size * 0.5);
+  glow.addColorStop(0, rgb01ToCss(rgb, 1));
+  glow.addColorStop(0.3, rgb01ToCss(rgb, 0.95));
+  glow.addColorStop(0.65, rgb01ToCss(rgb, 0.35));
+  glow.addColorStop(1, rgb01ToCss(rgb, 0));
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, size * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = dragging ? rgb01ToCss(rgb, 1) : rgb01ToCss(rgb, 0.76);
   ctx.lineWidth = Math.max(2, 2 * ratio);
   ctx.beginPath();
   ctx.arc(pos.x, pos.y, size * 0.48, 0, Math.PI * 2);
@@ -252,7 +259,6 @@ export function drawPreview({
   lightSettings,
   pixelated,
   draggingLight,
-  lightSprite,
   splitRatio = 0.5,
   viewTilt,
   heightScale = 0,
@@ -341,7 +347,7 @@ export function drawPreview({
     ctx.lineTo(splitX, rect.y + rect.height);
     ctx.stroke();
   }
-  drawLightHandle(ctx, light, source, rect, draggingLight, lightSprite);
+  drawLightHandle(ctx, light, source, rect, draggingLight, lightSettings?.diffuseColor);
   return rect;
 }
 

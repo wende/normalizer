@@ -52,12 +52,12 @@ function drawOverlay(octx, canvas, drawArgs, rect) {
   if (drawArgs.mode === "split") {
     drawSplitDivider(octx, rect, drawArgs.splitRatio ?? 0.5, drawArgs.draggingSplit);
   }
-  drawLightHandle(octx, drawArgs.light, drawArgs.source, rect, drawArgs.draggingLight, drawArgs.lightSprite);
+  drawLightHandle(octx, drawArgs.light, drawArgs.source, rect, drawArgs.draggingLight, drawArgs.lightSettings?.diffuseColor);
 }
 
 function cpuFallback(overlay, octx, drawArgs) {
   const {
-    source, normal, specular, parallax, occlusion, mode, pipeline, light, pixelated, draggingLight, lightSprite,
+    source, normal, specular, parallax, occlusion, mode, pipeline, light, pixelated, draggingLight,
     lightSettings, toon, splitRatio, viewTilt, heightScale,
   } = drawArgs;
   const litCache = source && normal ? renderLit(source, normal, lightSettings, toon, specular, occlusion) : null;
@@ -76,7 +76,6 @@ function cpuFallback(overlay, octx, drawArgs) {
     lightSettings,
     pixelated,
     draggingLight,
-    lightSprite,
     splitRatio,
     viewTilt,
     heightScale,
@@ -131,7 +130,6 @@ export function PreviewArea({
   onViewTilt,
   onSplitRatioChange,
   splitRatio,
-  lightSprite,
   lastRectRef,
 }) {
   const glCanvasRef = useRef(null);
