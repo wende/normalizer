@@ -7,7 +7,7 @@
  * binary via its --cli flag. Reads an 8-bit PNG, writes an 8-bit RGBA map.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import pngjs from "pngjs";
 import { generateNormalMap, DEFAULT_NORMAL_PARAMS } from "../shared/normal.js";
 import { generateSpecularMap, DEFAULT_SPECULAR_PARAMS } from "../shared/specular.js";
@@ -24,6 +24,7 @@ const USAGE = [
   "  specular                         generate a specular reflectivity map",
   "  parallax                         generate a parallax (height) map",
   "  occlusion                        generate an ambient-occlusion map",
+  "  ai                               generate a normal map via DeepBump (needs onnxruntime-node)",
   "",
   "normal options:",
   "  --normal-depth <int>             emboss strength (default 250)",
@@ -70,6 +71,12 @@ const USAGE = [
   "  --occlusion-invert               invert the map",
   "  --use-occlusion-alpha            copy the source alpha into the output",
   "  --pixel-size <int>               art-pixel block size (default 1)",
+  "",
+  "ai options:",
+  "  --overlap <SMALL|MEDIUM|LARGE>   tile overlap (default LARGE)",
+  "  --denoise <int>                  bilateral pre-filter radius (default 0)",
+  "  --no-mask-alpha                  ignore transparency when graying",
+  "  --model <path>                   deepbump256.onnx location",
 ].join("\n");
 
 function failUsage(message) {
@@ -279,7 +286,37 @@ const PARSERS = {
   specular: parseSpecularFlags,
   parallax: parseParallaxFlags,
   occlusion: parseOcclusionFlags,
+  ai: parseAiFlags,
 };
+
+function parseAiFlags(args) {
+  const params = { overlap: "LARGE", denoise: 0, maskAlpha: true, model: null };
+  for (let i = 3; i < args.length; i += 1) {
+    const arg = args[i];
+    switch (arg) {
+      case "--overlap": {
+        const v = requireValue(args, (i += 1), arg);
+        if (v !== "SMALL" && v !== "MEDIUM" && v !== "LARGE") {
+          fail(`${arg} must be SMALL, MEDIUM or LARGE`);
+        }
+        params.overlap = v;
+        break;
+      }
+      case "--denoise":
+        params.denoise = parseInt32(requireValue(args, (i += 1), arg), arg);
+        break;
+      case "--no-mask-alpha":
+        params.maskAlpha = false;
+        break;
+      case "--model":
+        params.model = requireValue(args, (i += 1), arg);
+        break;
+      default:
+        fail(`unknown option: ${arg}`);
+    }
+  }
+  return params;
+}
 
 function parseArgs(args) {
   if (args.length === 0) {
@@ -320,11 +357,61 @@ try {
 
 const source = { width: inputPng.width, height: inputPng.height, data: inputPng.data };
 
+// DeepBump path: async inference through the DOM-free core in web/, lazily
+// resolving the optional onnxruntime-node dep so the other subcommands keep
+// working without it (or without the 27MB model) installed.
+async function runAi() {
+  const modelPath =
+    params.model ||
+    process.env.DEEPBUMP_MODEL ||
+    new URL("../tests/deepbump/deepbump256.onnx", import.meta.url).pathname;
+  try {
+    statSync(modelPath);
+  } catch {
+    fail(
+      `model not found: ${modelPath}\n` +
+        "Download it (27MB):\n" +
+        "  curl -L -o tests/deepbump/deepbump256.onnx " +
+        "https://raw.githubusercontent.com/HugoTini/DeepBump/master/deepbump256.onnx"
+    );
+  }
+
+  let ort;
+  try {
+    ({ default: ort } = await import("onnxruntime-node"));
+  } catch {
+    fail("onnxruntime-node is not installed — run: npm i -O onnxruntime-node");
+  }
+
+  await import(new URL("../web/deepbump_infer.js", import.meta.url));
+  const { colorToNormals } = globalThis.DeepBumpInfer;
+
+  const session = await ort.InferenceSession.create(modelPath);
+  const runTile = async (tile) => {
+    const t = new ort.Tensor("float32", tile, [1, 1, 256, 256]);
+    const r = await session.run({ input: t });
+    return r.output.data;
+  };
+
+  try {
+    return await colorToNormals(source, params.overlap, runTile, null, {
+      denoise: params.denoise,
+      maskAlpha: params.maskAlpha,
+    });
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
 let out;
-try {
-  out = GENERATORS[command](source, params);
-} catch (error) {
-  fail(error.message);
+if (command === "ai") {
+  out = await runAi();
+} else {
+  try {
+    out = GENERATORS[command](source, params);
+  } catch (error) {
+    fail(error.message);
+  }
 }
 
 const outputPng = new PNG({ width: out.width, height: out.height });

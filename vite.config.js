@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, createReadStream, existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, extname, resolve } from "node:path";
 import preact from "@preact/preset-vite";
 
 const require = createRequire(import.meta.url);
@@ -48,6 +48,41 @@ function optionalDevPlugins(command) {
   return plugins;
 }
 
+// Dev-only: serve the top-level demo/ (three.js normal-map showcase) at /demo/
+// so `make web` also serves it. apply:"serve" keeps vite build / Vercel untouched.
+function serveDemo() {
+  const mounts = {
+    "/demo": resolve(repoRoot, "demo"),
+    "/node_modules": resolve(repoRoot, "node_modules"),
+  };
+  const MIME = {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".json": "application/json",
+    ".wasm": "application/wasm",
+  };
+  return {
+    name: "serve-demo",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = new URL(req.url, "http://x").pathname;
+        const key = Object.keys(mounts).find((m) => url === m || url.startsWith(m + "/"));
+        if (!key) return next();
+        let file = resolve(mounts[key], "." + url.slice(key.length));
+        if (!file.startsWith(mounts[key])) return next(); // traversal guard
+        if (existsSync(file) && statSync(file).isDirectory()) file = resolve(file, "index.html");
+        if (!existsSync(file)) return next();
+        res.setHeader("Content-Type", MIME[extname(file)] ?? "application/octet-stream");
+        createReadStream(file).pipe(res);
+      });
+    },
+  };
+}
+
 function preactBabelPlugins(command) {
   if (command !== "serve") return [];
   try {
@@ -73,6 +108,7 @@ export default defineConfig(({ command }) => ({
       },
     }),
     ...optionalDevPlugins(command),
+    serveDemo(),
     copyRootStaticAssets(),
   ],
 }));
