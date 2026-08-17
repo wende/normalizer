@@ -45,7 +45,7 @@ import { detectPixelSize, pixelateNormalMap } from "shared/pixelScale.js";
 
 const SAMPLE_SRC = "./demo.png";
 const SAMPLE_AI_NORMAL_SRC = "./demo_ai_normal.png";
-const LIGHT_SPRITE_SRC = "./normalizer_texture.png";
+const LIGHT_SPRITE_SRC = "./light_sprite.svg";
 const SAMPLE_LOAD_ERROR = "Could not load sample image.";
 const SAMPLE_BASE_NAME = "demo";
 const HYDRATE_SKIP_MS = 100;
