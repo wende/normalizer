@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Normalizer — a normal/texture-map generator with a dependency-free JS core shared by the browser app and a Node CLI.",
   "license": "GPL-3.0",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "build": "vite build",
     "dev": "vite --port 8765 --strictPort",
@@ -14,16 +17,18 @@
   "dependencies": {
     "fflate": "^0.8.3",
     "pngjs": "^7.0.0",
-    "preact": "^10.22.0",
-    "three": "^0.185.1",
-    "vite": "^5.4.0"
+    "preact": "^10.22.0"
   },
   "devDependencies": {
     "@locator/babel-jsx": "^0.5.1",
     "@playwright/test": "^1.61.1",
-    "@preact/preset-vite": "^2.10.5"
+    "@preact/preset-vite": "^2.10.6",
+    "vite": "^8.2.1"
   },
   "optionalDependencies": {
     "onnxruntime-node": "^1.27.0"
+  },
+  "overrides": {
+    "adm-zip": "^0.6.0"
   }
 }

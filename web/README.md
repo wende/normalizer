@@ -73,7 +73,8 @@ a classic Web Worker so ONNX inference never blocks the UI thread. The worker:
 ### Local model fallback
 
 By default the worker downloads `deepbump256.onnx` from
-`https://raw.githubusercontent.com/HugoTini/DeepBump/master/deepbump256.onnx`.
+DeepBump commit `fad19ba87daed12b1d0410a57e74f3d79e82f78d`, so upstream changes
+cannot silently replace the model used by the app.
 To host the model locally instead:
 
 1. Download `deepbump256.onnx` and drop it next to `deepbump.worker.js`

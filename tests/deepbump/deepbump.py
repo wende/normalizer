@@ -228,7 +228,8 @@ def main():
             f"Model not found: {model_path}\n"
             "Download it (27MB):\n"
             "  curl -L -o deepbump256.onnx "
-            "https://github.com/HugoTini/DeepBump/raw/master/deepbump256.onnx"
+            "https://raw.githubusercontent.com/HugoTini/DeepBump/"
+            "fad19ba87daed12b1d0410a57e74f3d79e82f78d/deepbump256.onnx"
         )
 
     # Load as RGB, to C,H,W float32 in [0,1]

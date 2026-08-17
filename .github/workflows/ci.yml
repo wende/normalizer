@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -31,28 +34,17 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # Drives the JS CLI over every manifest case. This is a crash/contract
-      # check, not a correctness gate: it writes output but diffs nothing.
-      # Upstream parity was deliberately abandoned (docs/NORMALIZER_FEATURES.md),
-      # so tests/golden/upstream/ is NOT a valid comparison target.
-      - name: Golden harness (CLI smoke)
-        run: make js-smoke
-
-      # Self-consistency only: renders the preview cases twice from the SAME
-      # code and diffs them. Catches nondeterminism, NOT regressions — a change
-      # to shared/ moves both sides together and still passes (verified: a
-      # normalDepth edit leaves this green).
-      #
-      # LIMITATION: nothing in this job fails when shared/ output changes.
-      # A real correctness gate needs a committed self-baseline (the JS output
-      # blessed as the reference) plus a diff step against it. That is the
-      # golden-harness repurposing in docs/NORMALIZER_FEATURES.md §2 —
-      # see PUBLISH_CHECKLIST.md #7.
-      - name: Preview self-consistency
-        run: make preview-self-check
+      - name: Generated-map regression baseline
+        run: make baseline-check
 
       - name: Production build
         run: npm run build
+
+      - name: Install browser for UI tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
 
       - name: Upload golden output on failure
         if: failure()
@@ -60,7 +52,7 @@ jobs:
         with:
           name: golden-output
           path: |
-            tests/golden/node/
-            tests/golden/node-rerun/
+            tests/golden/current/
+            test-results/
           retention-days: 7
           if-no-files-found: ignore

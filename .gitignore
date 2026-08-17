@@ -30,4 +30,5 @@ experiments/**/*.png
 web/dist/
 .vercel/
 .playwright-cli/
+output/playwright/
 .vercel

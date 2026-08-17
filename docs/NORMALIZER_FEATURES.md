@@ -88,13 +88,11 @@ inventory in REWRITE_PLAN.md §2.
   blurs, the expensive path) runs in `web/src/normal.worker.js` via
   `useNormalWorker.js`; specular/parallax/occlusion stay on the main thread
   (cheap). Add a per-map pool only if profiling shows it hurts.
-- 🟡 **Self-regression goldens** — PARTIAL. `make js-smoke` and
-  `make preview-self-check` run the JS CLI and compare Node output against
-  itself, but `tests/golden/manifest.json` still describes itself as
-  "validating the Laigter rewrite against upstream Laigter" and the upstream
-  PNGs are still checked in as an escape hatch. The full conversion (commit a
-  self-baseline of the JS output and diff against it) is not done — tracked in
-  `PUBLISH_CHECKLIST.md` #7.
+- ✅ ~~**Self-regression goldens**~~ — DONE. `tests/golden/baseline/` contains
+  committed JS normal/preview outputs. `make baseline-check` regenerates the
+  current outputs and diffs them using each manifest case's tolerance; CI runs
+  it on every push and pull request. `make refresh-baseline` is the explicit
+  maintainer action for reviewed algorithm changes.
 - ✅ ~~**Unit tests wired into npm**~~ — DONE. `npm test` runs
   `tests/specular.test.js`, `tests/parallax.test.js`,
   `tests/occlusion.test.js`, `tests/flat-plane-offset.test.js`,
@@ -116,8 +114,8 @@ inventory in REWRITE_PLAN.md §2.
 - ✅ ~~**Upstream golden corpus / pixel-diff parity**~~ — DROPPED, fully
   executed 2026-08-17. The C++ core, `CMakeLists.txt`, the C++ `Makefile`
   targets, and the `make golden` / `preview-diff` upstream-comparison targets
-  are removed. The JS CLI is validated against itself (`make js-smoke`,
-  `make preview-self-check`). Later the same day the repo was fully
+  are removed. The JS implementation is validated against its committed
+  self-baseline (`make baseline-check`). Later the same day the repo was fully
   de-vendored: the `laigter/` submodule, `tests/golden/upstream/*.png`, and
   the `regenerate-goldens` tooling were removed — nothing from upstream
   remains in the tree.

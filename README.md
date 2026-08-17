@@ -43,24 +43,6 @@ They are never blended — the active pipeline drives every view and the export.
 DeepBump produces normals only; specular, height, and occlusion are always
 procedural.
 
-### Does it hold up in a real scene?
-
-The bundled three.js demo drops the generated maps onto a lit top-down landscape,
-with a normal-maps ON/OFF toggle as the headline A/B.
-
-<!-- SCREENSHOT: 3D demo scene — drop file at docs/images/demo-scene.png -->
-![Three.js demo scene lit with generated maps](docs/images/demo-scene.png)
-
-```sh
-make web        # then open http://localhost:8765/demo/
-```
-
-It deliberately exposes the artifacts too — flip the green channel to see the
-classic DirectX/OpenGL convention bug, or orbit with billboarding on to watch
-tangent-space shading swim on camera-facing quads. See [demo/README.md](demo/README.md).
-
----
-
 ## Quickstart
 
 ### Browser
@@ -123,7 +105,6 @@ browser app and the CLI run **identical** code.
 shared/      pure algorithms (normal, specular, parallax, occlusion, primitives)
 web/         Preact app + WebGL lit preview + DeepBump worker
 cli/         Node CLI (pngjs I/O)
-demo/        three.js scene for judging maps in a real lit context
 tests/       unit tests + golden-image harness
 ```
 
@@ -133,7 +114,8 @@ cd normalizer
 npm install
 
 npm test           # unit tests
-make js-smoke      # golden-image harness against the CLI
+make baseline-check # generated-map regression images
+npm run test:e2e   # browser UI flows
 npm run build      # production build
 ```
 

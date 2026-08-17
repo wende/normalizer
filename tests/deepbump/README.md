@@ -18,8 +18,11 @@ pip install -r requirements.txt
 
 # one-time: download the model (~27MB, not committed)
 curl -L -o deepbump256.onnx \
-  https://github.com/HugoTini/DeepBump/raw/master/deepbump256.onnx
+  https://raw.githubusercontent.com/HugoTini/DeepBump/fad19ba87daed12b1d0410a57e74f3d79e82f78d/deepbump256.onnx
 ```
+
+Expected SHA-256:
+`3a2ababc5fa652b19040a0f3d639b71826368e52ad805cf70ffb0e7c96a54d67`.
 
 ## Usage
 
@@ -132,7 +135,6 @@ node verify_web_parity.mjs   # max channel delta observed: 1 LSB
 `sample_normal_js.png` is the output of this JS core (via the shared
 `deepbump_infer.js`) — visually identical to the Python `sample_normal.png`.
 
-Prod-build caveat: under `make web` (server.js) or `vite` dev, files in `web/`
-are served at `/`, so `/deepbump.worker.js` and `/deepbump_infer.js` resolve.
-For a `vite build`, move those two files into `web/public/` (Vite only copies
-`publicDir` + imported assets to `dist/`).
+`vite.config.js` copies `deepbump.worker.js`, `deepbump_infer.js`, and the sample
+assets into the production build. The same files are served directly from
+`web/` during local development.

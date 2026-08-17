@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diff current generated PNGs against upstream golden PNGs."""
+"""Diff current generated PNGs against the committed JS baseline."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def compare_pngs(expected_path: Path, actual_path: Path, max_channel_delta: int)
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", default="tests/golden/manifest.json")
-    parser.add_argument("--expected-dir", default="tests/golden/upstream")
+    parser.add_argument("--expected-dir", default="tests/golden/baseline")
     parser.add_argument("--actual-dir", default="tests/golden/current")
     parser.add_argument("--case", dest="case_id")
     parser.add_argument("--map", dest="map_name", help="only run cases with this map type")
@@ -93,11 +93,8 @@ def main() -> int:
 
         if not expected_path.exists():
             failures += 1
-            hint = (
-                "Generate the expected side first (e.g. make preview-goldens "
-                "for preview cases)."
-            )
-            print(f"FAIL {case['id']}: missing upstream {map_name} golden {expected_path}. {hint}")
+            hint = "Generate reviewed expectations with make refresh-baseline."
+            print(f"FAIL {case['id']}: missing {map_name} baseline {expected_path}. {hint}")
             continue
         if not actual_path.exists():
             failures += 1

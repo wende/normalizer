@@ -1,25 +1,21 @@
 # Golden-output validation
 
-This harness runs the JS CLI over `tests/golden/manifest.json` and diffs PNG
-output. Upstream parity is retired (declared dropped in
-`docs/NORMALIZER_FEATURES.md` §4; the C++ core was removed 2026-08-17) — the
-active checks are self-consistency and crash/contract coverage. All manifest
-inputs are this repo's own assets (`web/demo.png` and the generated fixtures).
+This harness runs the JS implementation over `tests/golden/manifest.json` and
+diffs its PNG output against the committed `tests/golden/baseline/`. Upstream
+parity is retired; all inputs and expected files are this repo's own assets.
 
-- **CLI smoke:** `make js-smoke` runs the Node CLI over every manifest case
-  into `tests/golden/node/`. It verifies the CLI runs and writes output; it
-  diffs nothing.
-- **Preview self-consistency:** `make preview-self-check` renders the preview
-  cases twice and diffs the runs. Catches nondeterminism, not regressions.
-
-There is currently **no correctness gate**: nothing fails when `shared/`
-output changes. The planned fix is a committed self-baseline of the JS output
-plus a diff step against it (see `PUBLISH_CHECKLIST.md` #7).
+- **Regression check:** `make baseline-check` generates current normal and
+  preview outputs into `tests/golden/current/` and compares them with the
+  committed baseline using each manifest case's tolerance.
+- **Refresh:** `make refresh-baseline` deliberately replaces the expected
+  images after a reviewed algorithm change. Inspect the image diff before
+  committing the refreshed files.
+- **Smoke-only helpers:** `make js-smoke` and `make preview-self-check` remain
+  available for focused local diagnostics.
 
 ```sh
 make fixtures
-make js-smoke
-make preview-self-check
+make baseline-check
 ```
 
 The manifest covers normal-map defaults and preview-lighting cases. Specular

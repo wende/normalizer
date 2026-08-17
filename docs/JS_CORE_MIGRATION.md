@@ -250,11 +250,11 @@ blur optimization, and it's also what parallax-HeightMap and
 occlusion-distance-mode will share.
 
 ### 5.9 Keeping the UI responsive
-Everything above lands on the main thread today. With four maps × mosaic ×
-sigma-50 blurs, that's guaranteed jank. Per NORMALIZER_FEATURES.md §2: one
-Web Worker, existing 40ms debounce, `postMessage` with **transferred**
-`ArrayBuffer`s (zero-copy). `shared/` being DOM-free is what makes the same
-code loadable in the worker and in Node without modification.
+The expensive procedural-normal path now runs in `web/src/normal.worker.js`
+through `useNormalWorker.js`, using transferred `ArrayBuffer`s. The cheaper
+specular/parallax/occlusion effects remain 40ms-debounced on the main thread.
+`shared/` being DOM-free is what makes the same code loadable in the worker and
+in Node without modification.
 
 ### 5.10 GPL follows the port
 The JS functions are translations of Laigter's GPL-3.0 code — the license

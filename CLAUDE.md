@@ -62,7 +62,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 
 ### Consumers
 
-- `web/src/` — Preact app (entry `main.jsx` → `App.jsx`). `previewRender.js` is the boundary that imports `shared/` and converts to/from `ImageData`. All controls live in one `ControlsPanel.jsx` — each map is a `{showX && …}` block gated by a `TABS` map (there are no per-map panel components), with matching preview `MODES` in `PreviewTabBar.jsx`. State is per-map React hooks in `App.jsx`; each map recomputes in a 40ms-debounced `useEffect` on the main thread today (single worker is a planned hygiene step in `docs/NORMALIZER_FEATURES.md` §2).
+- `web/src/` — Preact app (entry `main.jsx` → `App.jsx`). `previewRender.js` is the boundary that imports `shared/` and converts to/from `ImageData`. All controls live in one `ControlsPanel.jsx` — each map is a `{showX && …}` block gated by a `TABS` map (there are no per-map panel components), with matching preview `MODES` in `PreviewTabBar.jsx`. State is per-map React hooks in `App.jsx`; the expensive procedural-normal path runs in `normal.worker.js` through `useNormalWorker.js`, while the cheaper specular/parallax/occlusion effects remain 40ms-debounced on the main thread.
 - `cli/normalizer.js` — the only CLI now that `core/` is retired. Uses `pngjs` for I/O. Subcommands: `normal`, `specular`, `parallax`, `occlusion`, `ai`.
 
 ### Golden harness
@@ -71,7 +71,8 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 - `scripts/generate_fixture_images.py` — deterministic PNG inputs into `tests/fixtures/inputs/generated/`.
 - `scripts/run_core_cases.py` — drives the JS CLI through the manifest (defaults to `cli/normalizer.js`).
 - `scripts/diff_pngs.py` — stdlib-only pixel diff using `scripts/golden_png.py` (no Pillow).
-- Upstream parity is dropped (`docs/NORMALIZER_FEATURES.md` §4) and the upstream goldens are gone (laigter de-vendored 2026-08-17). The planned self-baseline repurposing (`docs/NORMALIZER_FEATURES.md` §2) is unstarted — see `PUBLISH_CHECKLIST.md` #7.
+- `tests/golden/baseline/` — committed JS outputs used by `make baseline-check`; refresh intentionally with `make refresh-baseline` after reviewing an algorithm change.
+- Upstream parity is dropped (`docs/NORMALIZER_FEATURES.md` §4) and the upstream goldens are gone (laigter de-vendored 2026-08-17).
 
 ### Serving the web app
 

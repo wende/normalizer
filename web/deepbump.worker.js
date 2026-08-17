@@ -20,7 +20,8 @@ const ORT_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/di
 // "/deepbump256.onnx" (`web/server.js` already serves `.onnx` as
 // application/octet-stream).
 const DEFAULT_MODEL_URL =
-  "https://raw.githubusercontent.com/HugoTini/DeepBump/master/deepbump256.onnx";
+  "https://raw.githubusercontent.com/HugoTini/DeepBump/" +
+  "fad19ba87daed12b1d0410a57e74f3d79e82f78d/deepbump256.onnx";
 const MODEL_CACHE = "deepbump-model-v1";
 
 importScripts(`${ORT_BASE}ort.min.js`);

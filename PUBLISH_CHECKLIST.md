@@ -1,171 +1,98 @@
 # Publish Checklist
 
-Pre-flight for flipping `wende/normalizer` from private to public.
-Audit run 2026-08-17 against `bbff0bb`.
+Pre-flight for changing `wende/normalizer` from private to public. Refreshed
+2026-08-17 after the final repository, history, dependency, browser, and GitHub
+exposure audit.
 
-## Already clean — no action needed
+## Repository ready
 
-Verified, recorded here so nobody re-audits it:
+- [x] GPL-3.0 text is present in `LICENSE`.
+- [x] Laigter and DeepBump derivation is credited in `README.md` and in the
+      relevant source headers.
+- [x] No upstream Laigter code, assets, submodule, or golden files remain in
+      the current tree.
+- [x] The three.js showcase is absent from `main` and its reachable history.
+      Its 27 files are preserved only on the local `demo` branch; do not push
+      that branch to the public repository.
+- [x] The full reachable history of every remote branch was scanned for common
+      credential formats, private keys, sensitive filenames, personal paths,
+      and credential-like assignments. No hits.
+- [x] Issues, pull requests, comments, recent Actions logs, and artifacts were
+      checked for the same exposure patterns. No hits.
+- [x] `.claude/`, local build output, browser artifacts, generated fixtures,
+      and model files are ignored.
+- [x] Root README includes a centered app capture, quickstart, CLI usage,
+      architecture links, and license attribution.
+- [x] The hosted app loads successfully; the next deployment includes the new
+      favicon, which was verified against the local production toolchain.
+- [x] The DeepBump model URL is pinned to immutable upstream commit
+      `fad19ba87daed12b1d0410a57e74f3d79e82f78d`; its expected SHA-256 is
+      documented in `tests/deepbump/README.md`.
 
-- **No secrets.** Tracked tree *and* full history grepped for API keys, tokens,
-  `.env`, private keys, AWS/GitHub/Slack credential patterns. Zero hits.
-- **No personal paths or emails** in tracked source.
-- **`.claude/` never committed** — gitignored from the first commit.
-- **Repo size is fine.** 15 MB `.git`; largest blob is `web/demo.png` at 2.1 MB.
-  No history rewrite needed for weight.
-- **Nothing vendored from upstream.** The `laigter/` submodule,
-  `tests/golden/upstream/*.png`, and the regenerate-goldens tooling were
-  removed 2026-08-17 — only GPL attribution headers (text) remain.
-- **Gates pass.** `npm test` → 28 checks; `make js-smoke` clean;
-  `npm run build` → 87 KB JS.
+## Install and dependency state
 
----
+- [x] npm is the single package-manager path. The stale pnpm lockfile and local
+      `../treelocatorjs` lock entries are removed.
+- [x] `package.json` keeps `"private": true` intentionally. This repository is
+      a web app and CLI source tree, not an npm package; the flag prevents an
+      accidental registry publication and does not affect GitHub visibility.
+- [x] The supported Node range is declared.
+- [x] `npm ci` succeeds from a clean archive.
+- [x] `npm audit` reports zero vulnerabilities. Vite is upgraded to 8.2.1 and
+      the optional ONNX runtime uses the patched `adm-zip` 0.6 line.
+- [x] Production dependency licenses are GPL-compatible.
 
-## MUST — legal blockers
+## Verification gates
 
-### 1. Add the GPL-3.0 license text
+- [x] Unit tests pass.
+- [x] `tests/golden/baseline/` contains reviewed normal and preview outputs.
+- [x] `make baseline-check` compares current output with that baseline and
+      fails on changes outside the manifest tolerances.
+- [x] The production Vite build succeeds.
+- [x] The browser suite passes all UI, preview, export, and project-file flows.
+- [x] GitHub Actions runs unit tests, the baseline check, the production build,
+      and browser tests with read-only repository permissions.
+- [ ] Require the CI job on `main` after the repository becomes public. The
+      current private-plan repository cannot create branch rulesets.
 
-`package.json` declares `"license": "GPL-3.0"` and ~15 files carry GPL
-derivation headers, but **there is no `LICENSE` file**. GPL-3.0 §4–5 requires
-distributing the license text with the work. Publishing Laigter-derived code
-without it is a license violation.
+## GitHub presentation and security
 
-```sh
-curl -sL https://www.gnu.org/licenses/gpl-3.0.txt -o LICENSE
-```
+- [x] Repository description set.
+- [x] Homepage set to `https://normalizer-red.vercel.app`.
+- [x] Topics set (`normal-map`, `pbr`, `game-development`, `pixel-art`,
+      `texture-generation`, `preact`).
+- [x] Dependency vulnerability alerts enabled.
+- [ ] Visibility changed to public.
 
-- [x] `LICENSE` added at repo root
-- [x] Derivation credited in `README.md`: derived from
-      [Laigter](https://github.com/azagaya/laigter) (GPL-3.0), and
-      [DeepBump](https://github.com/HugoTini/DeepBump) (GPL-3.0) for the AI path
+## Intentional public exposure
 
-### 2. Decide on `"private": true`
+These are not code blockers, but should be understood before the visibility
+change:
 
-`package.json` has `"private": true`, which blocks `npm publish`. Keep it if
-this is not going to npm — but make it a decision, not a leftover.
+- The Git history contains the accepted, removed MIT-licensed
+  `third_party/normalcy/` implementation.
+- Commit metadata exposes `krzysztof@wende.dev` and `wende@hey.com`.
+- Thirteen non-main remote branches will also become visible. They contain no
+  detected secrets, but their heads predate the C++ core retirement; one also
+  still contains `third_party/normalcy/`.
 
-- [ ] Confirmed intentional (keep) **or** removed with a publish plan
+No further history rewrite is recommended. Delete obsolete remote branches
+only if their collaboration history is no longer useful.
 
----
+## Publication
 
-## SHOULD — before flipping the switch
+Changing visibility remains an explicit owner action:
 
-### 3. Root `README.md`
-
-The repo root currently has only `CLAUDE.md`. A public repo whose landing page
-is an agent-instructions file reads as unfinished. `web/README.md` has good
-content but is buried one level down.
-
-- [x] `README.md` written (what it is, screenshot, quickstart, CLI usage,
-      architecture pointer, license/attribution)
-
-### 4. `third_party/normalcy/` is in git history
-
-Added in `c19e327`, removed in `1abf4e2` ("Replace Normalcy AI with in-browser
-DeepBump"). MIT-licensed, contains no secrets — but it is a separate project
-that becomes permanently public and reachable via history. The only fix is a
-history rewrite (`git filter-repo`), which breaks every existing clone and SHA.
-
-- [x] Accepted as-is (decided 2026-08-17 — it is MIT and harmless)
-
-### 5. Golden fixtures derive from upstream art — DONE
-
-Was: 3 manifest cases fed `laigter/images/sample.png` and
-`tests/golden/upstream/sample_defaults_normal.png` was a committed
-derivative. Resolved 2026-08-17 by de-vendoring: manifest inputs swapped to
-`web/demo.png` (cases renamed `demo_defaults`, `preview_demo_center`,
-`preview_demo_corner`), the submodule and all `tests/golden/upstream/*.png`
-deleted, CI no longer checks out submodules. Nothing from the upstream repo
-remains in the tree.
-
-- [x] Swapped to `web/demo.png`; all upstream assets removed
-
-### 6. Clear `npm audit`
-
-`npm audit fix` (non-breaking) reduces 6 → 4 vulnerabilities. Remaining 4
-require `--force` (Vite 6 → 8, onnxruntime-node 1.22 → 1.21) — both dev/optional
-chains, not shipped runtime. Acceptable to triage; Dependabot will reopen the
-issue as upgrades land.
-
-```sh
-npm audit fix        # 6 → 4 (done 2026-08-17)
-npm audit fix --force # would clear all, but breaks Vite and onnxruntime-node
-```
-
-- [x] `npm audit` triaged: 4 remaining are dev/optional, --force deferred
-
-### 7. Add CI
-
-`.github/workflows/ci.yml` now exists and runs `npm test` + `make js-smoke` +
-`make preview-self-check` + `npm run build` on push/PR. Verified against a clean
-clone.
-
-- [x] `.github/workflows/ci.yml` running the gates
-- [ ] Branch protection on `main` requiring the check (optional)
-
-#### Known gap: no correctness gate
-
-All current gates can pass while `shared/` output changes. Verified empirically
-(2026-08-17): `npm test`, `make js-smoke`, and `make preview-self-check` all stay
-green after an algorithm edit, because `js-smoke` diffs nothing and
-`preview-self-check` generates both sides from the same code. A real gate needs
-a **committed self-baseline** of the JS output plus a diff step — the
-golden-harness repurposing planned in `docs/NORMALIZER_FEATURES.md` §2. The
-blocker on this was retiring `core/` (#10), which is now done. The workflow
-documents the gap in-line.
-
-- [ ] Self-baseline committed and diffed in CI
-
-### 8. Settle the working tree — DONE
-
-Everything committed 2026-08-17 (`bcf7906` features + `demo/`, `bc96ace`
-core retirement, `de3aca2` publish prep). `demo/` was committed whole —
-5.5 MB, smaller than the original estimate — including `generate.sh` and
-`PROMPTS.md` with the verbatim image-generation prompts.
-
-- [x] Pending changes committed
-- [x] Decision on `demo/`: committed (5.5 MB accepted)
-
----
-
-## CAN — optional polish
-
-### 9. GPL headers on remaining files
-
-~20 files lack the derivation header (`shared/image.js`,
-`shared/primitives.js`, all of `web/src/*.jsx`). Most are original work, so a
-root `LICENSE` covers them; per-file headers are convention, not obligation.
-
-- [ ] Headers added to originals (low priority)
-
-### 10. Delete the retiring C++ core — DONE
-
-`core/`, `CMakeLists.txt`, the C++ `Makefile` targets, and the `make golden` /
-`preview-diff` upstream-parity targets were removed 2026-08-17. The escape
-hatch (`tests/golden/upstream/`, regenerate-goldens tooling) was removed
-later the same day — see #5.
-
-- [x] `core/` removed
-
-### 11. GitHub repo metadata
-
-Description is empty. Homepage already points at `normalizer-red.vercel.app`.
-
-- [ ] Description set
-- [ ] Topics added (e.g. `normal-map`, `pbr`, `game-dev`, `pixel-art`, `laigter`)
-
-### 12. `CLAUDE.md` stays
-
-It is agent-facing but genuinely good architecture documentation. Keep it
-public and link to it from `README.md`.
-
-- [x] Linked from `README.md`
-
----
-
-## Minimum to unblock
+- [ ] Commit this final cleanup, then replace the remote `main` history with
+      `git push --force-with-lease origin main`; confirm the expanded CI job is
+      green. The force push is required because the nine commits beginning with
+      the original demo introduction were rewritten to exclude `demo/`.
+- [ ] Keep the local `demo` branch unpushed. Branches in a public GitHub
+      repository are public too.
 
 ```sh
-# decide remaining items, commit pending work + demo/ + LICENSE + README, then:
 gh repo edit wende/normalizer --visibility public
 ```
+
+After that succeeds, add a `main` ruleset requiring the CI job and mark the
+visibility and branch-protection items complete.
