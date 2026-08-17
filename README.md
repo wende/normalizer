@@ -6,8 +6,7 @@ account.
 
 **[Try it → normalizer-red.vercel.app](https://normalizer-red.vercel.app)**
 
-<!-- SCREENSHOT: web app UI — drop file at docs/images/app.png -->
-![Normalizer web app](docs/images/app.png)
+![Normalizer web app](docs/images/app.gif)
 
 Built for 2D game art: sprites, tilesets, and hand-painted textures that need to
 light convincingly in a 3D or 2.5D engine.
