@@ -42,7 +42,7 @@ function staticPath(urlPath) {
     pathname = pathname.slice(4);
   }
 
-  const staticRoot = pathname.startsWith("/laigter/") || pathname.startsWith("/shared/") ? repoRoot : webRoot;
+  const staticRoot = pathname.startsWith("/shared/") ? repoRoot : webRoot;
   const resolved = path.resolve(staticRoot, `.${pathname}`);
   if (!resolved.startsWith(staticRoot)) {
     return null;

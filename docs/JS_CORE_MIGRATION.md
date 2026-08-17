@@ -5,7 +5,9 @@
 > `core/`, `CMakeLists.txt`, and the C++ `Makefile` targets are deleted (§7).
 > This file is kept because `shared/*.js` cite its §5 pain points (blur
 > divergence, premultiplied-alpha traps, erode/dilate semantics, threshold
-> edge cases) as their engineering rationale.
+> edge cases) as their engineering rationale. Postscript: the `laigter/`
+> submodule and `tests/golden/upstream/` goldens referenced below were
+> removed later the same day — read upstream on GitHub instead.
 
 How to reimplement everything the C++ core (`core/`) does — and everything it
 was *going* to do per [REWRITE_PLAN.md](REWRITE_PLAN.md) §1 — in JavaScript,

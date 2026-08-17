@@ -94,13 +94,8 @@ def main() -> int:
         if not expected_path.exists():
             failures += 1
             hint = (
-                "Run make regenerate-goldens UPSTREAM_LAIGTER=/path/to/laigter."
-                if map_name == "normal"
-                else (
-                    "Capture via the Laigter GUI: open the source image, set the "
-                    "light per case['light'], View Mode=Preview, File>Export "
-                    "Preview to the expected path."
-                )
+                "Generate the expected side first (e.g. make preview-goldens "
+                "for preview cases)."
             )
             print(f"FAIL {case['id']}: missing upstream {map_name} golden {expected_path}. {hint}")
             continue

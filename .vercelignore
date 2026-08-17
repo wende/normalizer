@@ -1,8 +1,5 @@
 build/
-core/
-laigter/
 tests/
-experiments/
 docs/
 .claude/
 .playwright-cli/

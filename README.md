@@ -122,11 +122,10 @@ web/         Preact app + WebGL lit preview + DeepBump worker
 cli/         Node CLI (pngjs I/O)
 demo/        three.js scene for judging maps in a real lit context
 tests/       unit tests + golden-image harness
-laigter/     upstream Laigter as a submodule — reference only, never edited
 ```
 
 ```sh
-git clone --recurse-submodules https://github.com/wende/normalizer.git
+git clone https://github.com/wende/normalizer.git
 cd normalizer
 npm install
 
@@ -135,7 +134,7 @@ make js-smoke      # golden-image harness against the CLI
 npm run build      # production build
 ```
 
-Architecture notes, conventions, and the rules about `laigter/` are in
+Architecture notes and conventions are in
 [CLAUDE.md](CLAUDE.md). Roadmap and design decisions are in [docs/](docs/).
 
 ---
@@ -147,8 +146,7 @@ Architecture notes, conventions, and the rules about `laigter/` are in
 This project is a derivative work and inherits its copyleft:
 
 - **[Laigter](https://github.com/azagaya/laigter)** (GPL-3.0) by azagaya — the
-  procedural normal/specular/parallax algorithms are ported from it, and it is
-  vendored as a submodule for parity reference. Files derived from it carry the
-  attribution in their header.
+  procedural normal/specular/parallax algorithms are ported from it. Files
+  derived from it carry the attribution in their header.
 - **[DeepBump](https://github.com/HugoTini/DeepBump)** (GPL-3.0) by HugoTini —
   the AI normal-map model and its tiling/inference math.

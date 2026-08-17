@@ -1,6 +1,5 @@
 build/
 .claude/
-laigter/translations/*.qm
 tests/fixtures/inputs/generated/
 tests/golden/current/
 

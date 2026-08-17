@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "description": "Golden-output cases for validating the Laigter rewrite against upstream Laigter.",
+  "description": "Golden cases for the normalizer JS CLI — self-consistency and crash/contract coverage. Upstream Laigter parity is retired and all inputs are this repo's own assets.",
   "cases": [
     {
-      "id": "sample_defaults",
+      "id": "demo_defaults",
       "enabled": true,
       "map": "normal",
-      "input": "laigter/images/sample.png",
+      "input": "web/demo.png",
       "params": {},
       "tolerance": {
         "max_channel_delta": 2,
@@ -80,10 +80,10 @@
       }
     },
     {
-      "id": "preview_sample_center",
+      "id": "preview_demo_center",
       "enabled": true,
       "map": "preview",
-      "input": "laigter/images/sample.png",
+      "input": "web/demo.png",
       "params": {},
       "light": { "x": 0, "y": 0, "z": 0.5 },
       "toon": false,
@@ -93,10 +93,10 @@
       }
     },
     {
-      "id": "preview_sample_corner",
+      "id": "preview_demo_corner",
       "enabled": true,
       "map": "preview",
-      "input": "laigter/images/sample.png",
+      "input": "web/demo.png",
       "params": {},
       "light": { "x": -120, "y": 80, "z": 0.2 },
       "toon": false,

@@ -13,8 +13,9 @@ Verified, recorded here so nobody re-audits it:
 - **`.claude/` never committed** — gitignored from the first commit.
 - **Repo size is fine.** 15 MB `.git`; largest blob is `web/demo.png` at 2.1 MB.
   No history rewrite needed for weight.
-- **Submodule clean.** `laigter/` pinned to upstream `azagaya/laigter`
-  @ `9b87b52`, no local modifications.
+- **Nothing vendored from upstream.** The `laigter/` submodule,
+  `tests/golden/upstream/*.png`, and the regenerate-goldens tooling were
+  removed 2026-08-17 — only GPL attribution headers (text) remain.
 - **Gates pass.** `npm test` → 28 checks; `make js-smoke` clean;
   `npm run build` → 87 KB JS.
 
@@ -67,15 +68,17 @@ history rewrite (`git filter-repo`), which breaks every existing clone and SHA.
 
 - [x] Accepted as-is (decided 2026-08-17 — it is MIT and harmless)
 
-### 5. Golden fixtures derive from upstream art
+### 5. Golden fixtures derive from upstream art — DONE
 
-`tests/golden/manifest.json` feeds `laigter/images/sample.png` into 3 cases,
-and `tests/golden/upstream/sample_defaults_normal.png` is a committed
-derivative of it. `make smoke` does the same. Legally fine (both GPL-3.0), but
-it contradicts the "never take assets from `laigter/`" rule in `CLAUDE.md` —
-already flagged there as a known exception.
+Was: 3 manifest cases fed `laigter/images/sample.png` and
+`tests/golden/upstream/sample_defaults_normal.png` was a committed
+derivative. Resolved 2026-08-17 by de-vendoring: manifest inputs swapped to
+`web/demo.png` (cases renamed `demo_defaults`, `preview_demo_center`,
+`preview_demo_corner`), the submodule and all `tests/golden/upstream/*.png`
+deleted, CI no longer checks out submodules. Nothing from the upstream repo
+remains in the tree.
 
-- [ ] Swapped to `web/demo.png`, **or** left alone with the exception noted
+- [x] Swapped to `web/demo.png`; all upstream assets removed
 
 ### 6. Clear `npm audit`
 
@@ -138,9 +141,9 @@ root `LICENSE` covers them; per-file headers are convention, not obligation.
 ### 10. Delete the retiring C++ core — DONE
 
 `core/`, `CMakeLists.txt`, the C++ `Makefile` targets, and the `make golden` /
-`preview-diff` upstream-parity targets were removed 2026-08-17.
-`tests/golden/upstream/` stays checked in as the escape hatch;
-`make regenerate-goldens-local` can still build upstream if it's ever needed.
+`preview-diff` upstream-parity targets were removed 2026-08-17. The escape
+hatch (`tests/golden/upstream/`, regenerate-goldens tooling) was removed
+later the same day — see #5.
 
 - [x] `core/` removed
 

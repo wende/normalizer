@@ -1,12 +1,9 @@
 SMOKE_OUT ?= /tmp/normalizer_demo_n.png
 WEB_PORT ?= 8765
-UPSTREAM_LAIGTER ?=
-UPSTREAM_BUILD_DIR ?= build/laigter-upstream
-UPSTREAM_LAIGTER_BIN ?= $(UPSTREAM_BUILD_DIR)/laigter.app/Contents/MacOS/laigter
 
 JS_CLI := cli/normalizer.js
 
-.PHONY: all clean smoke web web-static install js-smoke fixtures current-goldens build-upstream-laigter regenerate-goldens regenerate-goldens-local preview-goldens preview-self-check
+.PHONY: all clean smoke web web-static install js-smoke fixtures current-goldens preview-goldens preview-self-check
 
 all: js-smoke
 
@@ -46,20 +43,6 @@ fixtures:
 
 current-goldens: fixtures
 	python3 scripts/run_core_cases.py --cli $(JS_CLI)
-
-# Upstream Laigter build + golden regeneration: escape hatch only, needed solely
-# to refresh tests/golden/upstream/*.png (upstream parity is no longer a gate).
-build-upstream-laigter:
-	@mkdir -p $(UPSTREAM_BUILD_DIR)
-	cd $(UPSTREAM_BUILD_DIR) && qmake $(CURDIR)/laigter/laigter.pro CONFIG+=sdk_no_version_check QMAKE_CXXFLAGS+=-Wno-error=implicit-function-declaration
-	$(MAKE) -C $(UPSTREAM_BUILD_DIR)
-
-regenerate-goldens: fixtures
-	@test -n "$(UPSTREAM_LAIGTER)" || (echo "Set UPSTREAM_LAIGTER=/path/to/upstream/laigter" && exit 2)
-	python3 scripts/generate_goldens.py --upstream-cli "$(UPSTREAM_LAIGTER)"
-
-regenerate-goldens-local: build-upstream-laigter fixtures
-	python3 scripts/generate_goldens.py --upstream-cli "$(UPSTREAM_LAIGTER_BIN)"
 
 clean:
 	rm -rf build

@@ -117,8 +117,10 @@ inventory in REWRITE_PLAN.md §2.
   executed 2026-08-17. The C++ core, `CMakeLists.txt`, the C++ `Makefile`
   targets, and the `make golden` / `preview-diff` upstream-comparison targets
   are removed. The JS CLI is validated against itself (`make js-smoke`,
-  `make preview-self-check`); `tests/golden/upstream/` stays checked in as
-  the escape hatch.
+  `make preview-self-check`). Later the same day the repo was fully
+  de-vendored: the `laigter/` submodule, `tests/golden/upstream/*.png`, and
+  the `regenerate-goldens` tooling were removed — nothing from upstream
+  remains in the tree.
 - ✅ ~~**WASM build, TS wrapper, Node WASM smoke test, WASM/core CI parity**~~
   — DROPPED. No Emscripten/WASM/`.ts` anywhere in the tree; decision held.
 - ✅ ~~**Legacy preset import** and **`.laigter` project import**~~ — DROPPED.
@@ -135,14 +137,15 @@ inventory in REWRITE_PLAN.md §2.
   so the UI, math module, shader pass, unit tests, and e2e coverage were
   removed. Revisit only with a clearer silhouette / ground-plane model.
 
-## Known loss / escape hatch
+## Known loss
 
 Dropping upstream parity stranded the golden-vs-upstream tooling as sunk
-cost. Accepted and executed: `core/` was deleted 2026-08-17.
-`tests/golden/upstream/` stays checked in — rebuilding upstream Laigter with
-Qt is the expensive part if bit-exactness is ever wanted again
-(REWRITE_PLAN.md Phase 0), and `make regenerate-goldens-local` still builds
-it.
+cost. Accepted and executed: `core/` was deleted 2026-08-17, and the escape
+hatch (`tests/golden/upstream/*.png`, `laigter/` submodule,
+`make regenerate-goldens*`) was removed the same day when the repo was
+de-vendored. If bit-exactness against upstream is ever wanted again
+(REWRITE_PLAN.md Phase 0), clone `azagaya/laigter` from GitHub, build it
+with Qt, and regenerate — nothing in-repo supports it anymore.
 
 ## Not in this plan, but shipped
 

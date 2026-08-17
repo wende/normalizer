@@ -9,17 +9,15 @@ This file provides guidance to coding agents working in this repository. `AGENTS
 - Browser UI (`web/`) — a Preact app in `web/src/` (JSX), served/built by Vite (`vite.config.js`; `make web`). It imports the `shared/` algorithms directly.
 - Node CLI (`cli/normalizer.js`) — uses `pngjs` for PNG I/O, ES modules.
 
-Both import pure-function algorithms from `shared/`. Upstream Laigter lives in `laigter/` as the porting reference and license root. The C++ rewrite (`core/`) was retired 2026-08-17 per `docs/JS_CORE_MIGRATION.md` §7 — `shared/` + the JS CLI are the only implementation.
+Both import pure-function algorithms from `shared/`. The C++ rewrite (`core/`) was retired 2026-08-17 per `docs/JS_CORE_MIGRATION.md` §7 — `shared/` + the JS CLI are the only implementation. Upstream Laigter is **not vendored** — no submodule, no upstream assets; read it on GitHub ([azagaya/laigter](https://github.com/azagaya/laigter)) when you need the porting reference.
 
-## `laigter/` is a reference, not a source
+## Upstream Laigter is a reference, not a source
 
-`laigter/` is a **git submodule** pinned to upstream [azagaya/laigter](https://github.com/azagaya/laigter) (Qt/C++). It is read-only reference material: the **porting reference** for algorithm parity and the **license root** for our GPL-3.0 derivation. It is not part of the product.
+Nothing from upstream [azagaya/laigter](https://github.com/azagaya/laigter) (Qt/C++) may land in this repo — not as a submodule, not as sample art, icons, screenshots, or fixtures. The repo was de-vendored 2026-08-17; only the GPL-3.0 derivation headers remain (text attribution, legally required).
 
-- **Never edit anything under `laigter/`.** It tracks upstream, and a local edit both silently dirties the submodule and destroys its value as a parity reference. Fix our code in `shared/`, `cli/`, or `web/` instead.
-- **No shipped code imports it.** `shared/`, `cli/`, and `web/src/` must never depend on it at runtime. Where our code is *derived* from it — e.g. `web/src/litGL.js` from `laigter/shaders/fshader.glsl` — that's a header comment crediting the port, not a dependency.
-- **Never take assets from `laigter/`** — not sample art, icons, screenshots, or fixtures. Its images (`laigter/images/sample.png`, the presskit, the flags) are upstream's, not our samples. Use ours (below).
-
-Read it to answer "what does upstream do here?" when porting a parameter or chasing a golden mismatch. The only build-level use left is `make regenerate-goldens-local`, which builds `laigter.pro` to produce an upstream binary for refreshing the escape-hatch goldens.
+- **No shipped code imports it.** `shared/`, `cli/`, and `web/src/` must never depend on it at runtime. Where our code is *derived* from it — e.g. `web/src/litGL.js` from upstream's `shaders/fshader.glsl` — that's a header comment crediting the port, not a dependency.
+- **Never take assets from upstream.** Use ours (below).
+- Read upstream on GitHub to answer "what does upstream do here?" when porting a parameter or chasing an algorithm question.
 
 ### Our own sample and fixture assets
 
@@ -45,12 +43,10 @@ All commands are run from the repo root.
 | Run Node CLI smoke against goldens | `make js-smoke` (requires `make install` first) |
 | Preview self-regression check | `make preview-self-check` — reruns preview cases and diffs Node output against itself |
 | Unit tests | `npm test` — runs the `tests/*.test.js` suite |
-| Regenerate goldens (manual path) | `make regenerate-goldens UPSTREAM_LAIGTER=/path/to/laigter` |
-| Regenerate goldens (local Qt build) | `make regenerate-goldens-local` |
 | Static file server (no API) | `make web-static` |
 | Clean build artifacts | `make clean` |
 
-`make web` runs the Vite dev server (JSX transform + HMR for `web/src/`), also serving `laigter/` and `shared/` from the repo root. There is no DB, no API endpoint, and no native asset — AI generation runs entirely in the browser via `web/deepbump.worker.js`. `make web-static` (or the standalone `web/server.js`) serves the same tree without Vite for a no-build/offline check, but won't transform JSX.
+`make web` runs the Vite dev server (JSX transform + HMR for `web/src/`), also serving `shared/` from the repo root. There is no DB, no API endpoint, and no native asset — AI generation runs entirely in the browser via `web/deepbump.worker.js`. `make web-static` (or the standalone `web/server.js`) serves the same tree without Vite for a no-build/offline check, but won't transform JSX.
 
 ## Architecture
 
@@ -74,13 +70,12 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 - `tests/golden/manifest.json` — declarative cases with per-case `tolerance` (`max_channel_delta`, `max_pixels_over_tolerance`).
 - `scripts/generate_fixture_images.py` — deterministic PNG inputs into `tests/fixtures/inputs/generated/`.
 - `scripts/run_core_cases.py` — drives the JS CLI through the manifest (defaults to `cli/normalizer.js`).
-- `scripts/generate_goldens.py` — invokes an upstream Laigter binary (escape hatch only).
 - `scripts/diff_pngs.py` — stdlib-only pixel diff using `scripts/golden_png.py` (no Pillow).
-- Upstream parity is dropped (`docs/NORMALIZER_FEATURES.md` §4); `tests/golden/upstream/` stays checked in as the escape hatch. The planned self-baseline repurposing (`docs/NORMALIZER_FEATURES.md` §2) is unstarted — see `PUBLISH_CHECKLIST.md` #7.
+- Upstream parity is dropped (`docs/NORMALIZER_FEATURES.md` §4) and the upstream goldens are gone (laigter de-vendored 2026-08-17). The planned self-baseline repurposing (`docs/NORMALIZER_FEATURES.md` §2) is unstarted — see `PUBLISH_CHECKLIST.md` #7.
 
 ### Serving the web app
 
-- `make web` runs Vite (`vite.config.js`): it transforms the JSX under `web/src/`, serves `web/`, and also serves `shared/` from the repo root (the app imports the shared modules directly). Vite is the normal dev path. `web/server.js` also happens to serve `/laigter/` from the repo root, but nothing in `web/src/` fetches it — the app's sample is `web/demo.png`.
+- `make web` runs Vite (`vite.config.js`): it transforms the JSX under `web/src/`, serves `web/`, and also serves `shared/` from the repo root (the app imports the shared modules directly). Vite is the normal dev path. The app's sample is `web/demo.png`.
 - `web/server.js` is a dependency-free static server for the same tree (no JSX transform); `make web-static` is the equivalent via `python3 -m http.server`. Both exist for no-build/offline checks.
 - The AI pipeline runs DeepBump via `web/deepbump.worker.js` in a Web Worker — no server endpoint is involved. The worker loads `onnxruntime-web` from a CDN, fetches and caches `deepbump256.onnx`, and runs tiled inference. See `web/README.md` for the controls and local-model fallback.
 
@@ -102,7 +97,7 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 
 ## Things to know before editing
 
-- `laigter/` is read-only upstream — never edit it, import from it, or pull sample art out of it. Our sample is `web/demo.png`. See "`laigter/` is a reference, not a source" above.
+- Nothing from upstream Laigter may land in this repo — no submodule, no assets. Our sample is `web/demo.png`. See "Upstream Laigter is a reference, not a source" above.
 - The browser and CLI both load `shared/` modules directly. Editing `shared/normal.js` affects both; verify with `make js-smoke` after non-trivial changes.
 - `alphaDistance` is the most expensive primitive and is currently recomputed on every slider tick (the debounced recompute `useEffect`s in `web/src/App.jsx`). Cache hooks are planned in `docs/JS_CORE_MIGRATION.md` §5.8 but not yet wired.
 - `gaussianBlur` diverges from CImg by a few LSB at borders / large sigma; this is accepted under "free to diverge" but documented in the function header.
