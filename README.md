@@ -1,3 +1,5 @@
+<div align="center">
+
 # Normalizer
 
 Generate **normal**, **specular**, **height**, and **ambient-occlusion** maps from a
@@ -6,10 +8,12 @@ account.
 
 **[Try it → normalizer-red.vercel.app](https://normalizer-red.vercel.app)**
 
-![Normalizer web app](docs/images/app.gif)
+<img src="docs/images/app.gif" alt="Normalizer web app">
 
 Built for 2D game art: sprites, tilesets, and hand-painted textures that need to
 light convincingly in a 3D or 2.5D engine.
+
+</div>
 
 ---
 
