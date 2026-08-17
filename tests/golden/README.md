@@ -1,23 +1,23 @@
 # Golden-output validation
 
-This harness compares CLI output against checked-in PNGs. It currently has
-two modes:
+This harness runs the JS CLI over `tests/golden/manifest.json` and diffs PNG
+output. Upstream parity is retired (declared dropped in
+`docs/NORMALIZER_FEATURES.md` §4; the C++ core was removed 2026-08-17) — the
+active checks are self-consistency and crash/contract coverage:
 
-- **Upstream parity (legacy):** `make golden` builds `build/laigter-core-cli`,
-  regenerates `tests/golden/current/`, and compares against
-  `tests/golden/upstream/` (PNGs captured from the original Qt Laigter). The
-  normal-map cases pass; the six `preview_*` cases fail because their
-  upstream preview PNGs were never captured.
-- **Self-regression (current):** `make js-smoke` runs the Node CLI into
-  `tests/golden/node/`; `make preview-self-check` reruns the preview cases
-  and diffs Node output against itself. These pass and are the active gate
-  for JS changes.
+- **CLI smoke:** `make js-smoke` runs the Node CLI over every manifest case
+  into `tests/golden/node/`. It verifies the CLI runs and writes output; it
+  diffs nothing.
+- **Preview self-consistency:** `make preview-self-check` renders the preview
+  cases twice and diffs the runs. Catches nondeterminism, not regressions.
+
+There is currently **no correctness gate**: nothing fails when `shared/`
+output changes. The planned fix is a committed self-baseline of the JS output
+plus a diff step against it (see `PUBLISH_CHECKLIST.md` #7).
 
 ```sh
 make fixtures
-make regenerate-goldens UPSTREAM_LAIGTER=/path/to/upstream/laigter   # only if refreshing upstream PNGs
-make golden          # legacy upstream parity (preview cases currently FAIL)
-make js-smoke        # Node CLI self-regression
+make js-smoke
 make preview-self-check
 ```
 
@@ -25,6 +25,14 @@ The manifest covers normal-map defaults and preview-lighting cases. Specular
 and parallax are covered by unit tests (`tests/specular.test.js`,
 `tests/parallax.test.js`, run via `npm test`) rather than golden cases.
 
-Per `docs/NORMALIZER_FEATURES.md` §2, the upstream-parity mode is being
-retired in favour of self-regression; the upstream PNGs stay checked in as
-an escape hatch.
+## Upstream escape hatch
+
+`tests/golden/upstream/*.png` stay checked in — they are irreplaceable
+without a Qt build of upstream Laigter. To refresh them (only if upstream
+parity is ever wanted again):
+
+```sh
+make regenerate-goldens UPSTREAM_LAIGTER=/path/to/upstream/laigter
+# or, with a local Qt build:
+make regenerate-goldens-local
+```

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the current laigter-core CLI for every active manifest case."""
+"""Run the normalizer CLI for every active manifest case."""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def run_case(repo: Path, cli: Path, case: dict, out_dir: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", default="tests/golden/manifest.json")
-    parser.add_argument("--cli", default="build/laigter-core-cli")
+    parser.add_argument("--cli", default="cli/normalizer.js")
     parser.add_argument("--out-dir", default="tests/golden/current")
     parser.add_argument("--case", dest="case_id")
     args = parser.parse_args()

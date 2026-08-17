@@ -9,7 +9,7 @@ This file provides guidance to coding agents working in this repository. `AGENTS
 - Browser UI (`web/`) — a Preact app in `web/src/` (JSX), served/built by Vite (`vite.config.js`; `make web`). It imports the `shared/` algorithms directly.
 - Node CLI (`cli/normalizer.js`) — uses `pngjs` for PNG I/O, ES modules.
 
-Both import pure-function algorithms from `shared/`. Upstream Laigter lives in `laigter/` as the porting reference and license root; the C++ rewrite (`core/`) is on the way out per `docs/NORMALIZER_FEATURES.md`.
+Both import pure-function algorithms from `shared/`. Upstream Laigter lives in `laigter/` as the porting reference and license root. The C++ rewrite (`core/`) was retired 2026-08-17 per `docs/JS_CORE_MIGRATION.md` §7 — `shared/` + the JS CLI are the only implementation.
 
 ## `laigter/` is a reference, not a source
 
@@ -19,9 +19,7 @@ Both import pure-function algorithms from `shared/`. Upstream Laigter lives in `
 - **No shipped code imports it.** `shared/`, `cli/`, and `web/src/` must never depend on it at runtime. Where our code is *derived* from it — e.g. `web/src/litGL.js` from `laigter/shaders/fshader.glsl` — that's a header comment crediting the port, not a dependency.
 - **Never take assets from `laigter/`** — not sample art, icons, screenshots, or fixtures. Its images (`laigter/images/sample.png`, the presskit, the flags) are upstream's, not our samples. Use ours (below).
 
-Read it to answer "what does upstream do here?" when porting a parameter or chasing a golden mismatch. The only build-level uses are reference-shaped and both belong to the retiring C++ path: the `Makefile` adds `-Ilaigter/thirdparty` for CImg, and `make regenerate-goldens-local` builds `laigter.pro` to produce an upstream binary for goldens.
-
-Known exception, not a precedent: `make smoke` still feeds `laigter/images/sample.png` to the C++ CLI. It predates this rule and should move to `web/demo.png` when that target is touched.
+Read it to answer "what does upstream do here?" when porting a parameter or chasing a golden mismatch. The only build-level use left is `make regenerate-goldens-local`, which builds `laigter.pro` to produce an upstream binary for refreshing the escape-hatch goldens.
 
 ### Our own sample and fixture assets
 
@@ -40,17 +38,15 @@ All commands are run from the repo root.
 | Task | Command |
 |---|---|
 | Install JS deps | `make install` (or `npm install`) |
-| Build C++ core | `make` — produces `build/laigter-core-cli` |
 | Run web server (dev) | `make web` (Vite, port 8765) or `WEB_PORT=9000 make web` |
-| Run smoke (C++ CLI) | `make smoke` |
+| Run smoke (JS CLI) | `make smoke` |
 | Generate fixtures | `make fixtures` |
-| Run golden suite against current impl | `make current-goldens` (uses C++ CLI by default) |
+| Run golden suite against current impl | `make current-goldens` |
 | Run Node CLI smoke against goldens | `make js-smoke` (requires `make install` first) |
 | Preview self-regression check | `make preview-self-check` — reruns preview cases and diffs Node output against itself |
-| Unit tests | `npm test` — runs `tests/specular.test.js` and `tests/parallax.test.js` |
+| Unit tests | `npm test` — runs the `tests/*.test.js` suite |
 | Regenerate goldens (manual path) | `make regenerate-goldens UPSTREAM_LAIGTER=/path/to/laigter` |
 | Regenerate goldens (local Qt build) | `make regenerate-goldens-local` |
-| Full golden gate | `make golden` — builds, regenerates `tests/golden/current/`, diffs via `scripts/diff_pngs.py` |
 | Static file server (no API) | `make web-static` |
 | Clean build artifacts | `make clean` |
 
@@ -71,20 +67,16 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 ### Consumers
 
 - `web/src/` — Preact app (entry `main.jsx` → `App.jsx`). `previewRender.js` is the boundary that imports `shared/` and converts to/from `ImageData`. All controls live in one `ControlsPanel.jsx` — each map is a `{showX && …}` block gated by a `TABS` map (there are no per-map panel components), with matching preview `MODES` in `PreviewTabBar.jsx`. State is per-map React hooks in `App.jsx`; each map recomputes in a 40ms-debounced `useEffect` on the main thread today (single worker is a planned hygiene step in `docs/NORMALIZER_FEATURES.md` §2).
-- `cli/normalizer.js` — mirrors the C++ CLI's argument/exit contract so `scripts/run_core_cases.py --cli` can swap either. Uses `pngjs` for I/O. Subcommands: `normal`, `specular`, `parallax`.
-
-### C++ core (retiring)
-
-`core/` mirrors the JS core via CImg. The `Makefile` and `CMakeLists.txt` build it; once the JS CLI covers every flag and `make golden` passes against the Node CLI, delete `core/`, `CMakeLists.txt`, the C++ targets in `Makefile`, and `build/` per `docs/JS_CORE_MIGRATION.md` §7.
+- `cli/normalizer.js` — the only CLI now that `core/` is retired. Uses `pngjs` for I/O. Subcommands: `normal`, `specular`, `parallax`, `occlusion`, `ai`.
 
 ### Golden harness
 
 - `tests/golden/manifest.json` — declarative cases with per-case `tolerance` (`max_channel_delta`, `max_pixels_over_tolerance`).
 - `scripts/generate_fixture_images.py` — deterministic PNG inputs into `tests/fixtures/inputs/generated/`.
-- `scripts/run_core_cases.py` — drives either CLI through the manifest. Defaults to `build/laigter-core-cli`; pass `--cli cli/normalizer.js` to point at the JS CLI.
-- `scripts/generate_goldens.py` — invokes an upstream Laigter binary.
+- `scripts/run_core_cases.py` — drives the JS CLI through the manifest (defaults to `cli/normalizer.js`).
+- `scripts/generate_goldens.py` — invokes an upstream Laigter binary (escape hatch only).
 - `scripts/diff_pngs.py` — stdlib-only pixel diff using `scripts/golden_png.py` (no Pillow).
-- Per `docs/NORMALIZER_FEATURES.md` §2, the harness will be repurposed to pin our own output (self-regression) once upstream parity is no longer the gate.
+- Upstream parity is dropped (`docs/NORMALIZER_FEATURES.md` §4); `tests/golden/upstream/` stays checked in as the escape hatch. The planned self-baseline repurposing (`docs/NORMALIZER_FEATURES.md` §2) is unstarted — see `PUBLISH_CHECKLIST.md` #7.
 
 ### Serving the web app
 
@@ -94,19 +86,18 @@ Pure-function ES modules, no DOM, no Node APIs. Record shape is `{ width, height
 
 ## Conventions
 
-- **License**: every file derived from Laigter must carry the GPL-3.0 derivation header (see top of `cli/normalizer.js`, `shared/normal.js`, `core/src/laigter_core.cpp`).
+- **License**: every file derived from Laigter must carry the GPL-3.0 derivation header (see top of `cli/normalizer.js`, `shared/normal.js`).
 - **Pure functions over typed arrays** in `shared/` — input params in, new buffer out. No mutation of caller data.
 - **No `ImageData` in `shared/`** — keeps it Node-loadable. Browser converts at the boundary.
 - **No build step for `shared/`**: it stays plain ESM — imported by the Vite-built web app (through `web/src/previewRender.js`) and by Node (the CLI) directly. Only the web UI's JSX goes through Vite; `shared/` never does.
-- **Parameter names** come from the JS module (`DEFAULT_NORMAL_PARAMS`); CLI flag names match. C++ names differ (`normal_depth` vs `normalDepth`) — `scripts/run_core_cases.py` bridges the two.
+- **Parameter names** come from the JS module (`DEFAULT_NORMAL_PARAMS`); CLI flag names match. The golden manifest uses the C++-era names (`normal_depth` vs `normalDepth`) — `scripts/run_core_cases.py` bridges the two.
 - **Tolerance defaults**: ±2 LSB max channel delta, 0 pixels over tolerance. Browser and CLI can differ by ±1 LSB on semi-transparent edges due to canvas premultiplication round-trips — adjust per-case tolerance if needed.
 
 ## Key references
 
 - `docs/NORMALIZER_FEATURES.md` — implement/defer/drop decisions; the active roadmap.
-- `docs/JS_CORE_MIGRATION.md` — engineering detail for retiring the C++ core; pain points (blur divergence, straight vs premultiplied alpha, erode/dilate, EDT caching).
-- `docs/REWRITE_PLAN.md` — original Qt→modern rewrite plan; largely superseded for WASM/Tauri/React paths, still authoritative for parameter ranges/defaults.
-- `docs/PREVIEW_GOLDEN_STRATEGY.md` — open decision on the preview golden cases.
+- `docs/JS_CORE_MIGRATION.md` — completed C++→JS migration; kept for the §5 pain points (blur divergence, straight vs premultiplied alpha, erode/dilate, EDT caching) cited from `shared/*.js`.
+- `docs/REWRITE_PLAN.md` — original Qt→modern rewrite plan; superseded (historical), still authoritative for parameter ranges/defaults (§2).
 - `tests/golden/README.md` — golden harness usage.
 
 ## Things to know before editing

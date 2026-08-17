@@ -1,5 +1,12 @@
 # Laigter UI Rewrite Plan
 
+> **Historical (superseded).** This was the original Qt→WASM/React/Tauri
+> rewrite plan. The WASM/React/Tauri track was dropped in
+> [NORMALIZER_FEATURES.md](NORMALIZER_FEATURES.md) in favour of a pure-JS
+> `shared/` core, and the C++ `core/` it produced was retired 2026-08-17.
+> Kept for one reason: §2's parameter inventory (ranges, defaults, upstream
+> quirks) is still the authoritative reference for the port.
+
 Goal: keep laigter's map-generation algorithms bit-for-bit (or near), replace the Qt Widgets UI with a modern stack.
 
 **License note:** laigter is GPL-3.0. Any project that links or embeds its algorithm code must be GPL-compatible.

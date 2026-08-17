@@ -1,5 +1,12 @@
 # Removing the C++ Dependency: Full JS Core Migration
 
+> **Status: complete (2026-08-17).** The migration below is done — `shared/`
+> holds all four generators, the JS CLI covers the old C++ CLI's flags, and
+> `core/`, `CMakeLists.txt`, and the C++ `Makefile` targets are deleted (§7).
+> This file is kept because `shared/*.js` cite its §5 pain points (blur
+> divergence, premultiplied-alpha traps, erode/dilate semantics, threshold
+> edge cases) as their engineering rationale.
+
 How to reimplement everything the C++ core (`core/`) does — and everything it
 was *going* to do per [REWRITE_PLAN.md](REWRITE_PLAN.md) §1 — in JavaScript,
 so the project has a single implementation with no native toolchain.

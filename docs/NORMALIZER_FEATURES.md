@@ -92,9 +92,9 @@ inventory in REWRITE_PLAN.md §2.
   `make preview-self-check` run the JS CLI and compare Node output against
   itself, but `tests/golden/manifest.json` still describes itself as
   "validating the Laigter rewrite against upstream Laigter" and the upstream
-  PNGs are still checked in as the primary target for `make golden`. The
-  full conversion (drop upstream comparison, keep only self-regression) is
-  not done. See `PREVIEW_GOLDEN_STRATEGY.md`.
+  PNGs are still checked in as an escape hatch. The full conversion (commit a
+  self-baseline of the JS output and diff against it) is not done — tracked in
+  `PUBLISH_CHECKLIST.md` #7.
 - ✅ ~~**Unit tests wired into npm**~~ — DONE. `npm test` runs
   `tests/specular.test.js`, `tests/parallax.test.js`,
   `tests/occlusion.test.js`, `tests/flat-plane-offset.test.js`,
@@ -113,12 +113,12 @@ inventory in REWRITE_PLAN.md §2.
 
 ## 4. Drop (invalidated by the decisions above)
 
-- 🟡 **Upstream golden corpus / pixel-diff parity** — DECLARED but only
-  PARTIALLY EXECUTED. `tests/golden/upstream/` is still checked in and
-  `make golden` still compares C++ output against it, but the JS CLI is
-  already validated only against itself (`make js-smoke`,
-  `make preview-self-check`). The harness is meant to survive only in its
-  self-regression role (§2 above); the full switch is unstarted.
+- ✅ ~~**Upstream golden corpus / pixel-diff parity**~~ — DROPPED, fully
+  executed 2026-08-17. The C++ core, `CMakeLists.txt`, the C++ `Makefile`
+  targets, and the `make golden` / `preview-diff` upstream-comparison targets
+  are removed. The JS CLI is validated against itself (`make js-smoke`,
+  `make preview-self-check`); `tests/golden/upstream/` stays checked in as
+  the escape hatch.
 - ✅ ~~**WASM build, TS wrapper, Node WASM smoke test, WASM/core CI parity**~~
   — DROPPED. No Emscripten/WASM/`.ts` anywhere in the tree; decision held.
 - ✅ ~~**Legacy preset import** and **`.laigter` project import**~~ — DROPPED.
@@ -137,16 +137,12 @@ inventory in REWRITE_PLAN.md §2.
 
 ## Known loss / escape hatch
 
-Dropping upstream parity strands the C++ core and the golden-vs-upstream
-tooling as sunk cost. Accepted. **Before deleting `core/` or
-`tests/golden/upstream/`**: confirm `make regenerate-goldens` against an
-upstream build still works, or keep the upstream PNGs checked in — rebuilding
-upstream Laigter with Qt later is the expensive part if bit-exactness is
-ever wanted again (REWRITE_PLAN.md Phase 0).
-
-Status (2026-07-07): neither deletion has happened — `core/` (with
-`include/`, `src/`, `tools/`) and `tests/golden/upstream/` are both still
-present. Consistent with the escape hatch: still reclaimable.
+Dropping upstream parity stranded the golden-vs-upstream tooling as sunk
+cost. Accepted and executed: `core/` was deleted 2026-08-17.
+`tests/golden/upstream/` stays checked in — rebuilding upstream Laigter with
+Qt is the expensive part if bit-exactness is ever wanted again
+(REWRITE_PLAN.md Phase 0), and `make regenerate-goldens-local` still builds
+it.
 
 ## Not in this plan, but shipped
 
